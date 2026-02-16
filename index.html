@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bot Beheer Dashboard</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg-color: var(--tg-theme-bg-color, #ffffff);
+            --text-color: var(--tg-theme-text-color, #222222);
+            --hint-color: var(--tg-theme-hint-color, #999999);
+            --button-color: var(--tg-theme-button-color, #2481cc);
+            --button-text-color: var(--tg-theme-button-text-color, #ffffff);
+            --secondary-bg-color: var(--tg-theme-secondary-bg-color, #f0f0f0);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        h2 { margin-top: 0; font-size: 22px; }
+        p.subtitle { color: var(--hint-color); font-size: 14px; margin-bottom: 20px; }
+
+        .card {
+            background-color: var(--secondary-bg-color);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .card h3 { margin: 0 0 10px 0; font-size: 16px; }
+
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 15px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border: 1px solid var(--hint-color);
+            border-radius: 6px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            box-sizing: border-box;
+        }
+
+        /* Simpele Toggle Switch css */
+        .switch { position: relative; display: inline-block; width: 40px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--button-color); }
+        input:checked + .slider:before { transform: translateX(16px); }
+
+        .main-btn {
+            background-color: var(--button-color);
+            color: var(--button-text-color);
+            border: none;
+            border-radius: 8px;
+            padding: 14px;
+            width: 100%;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>⚙️ Bot Dashboard</h2>
+    <p class="subtitle">Welkom <span id="userName">Admin</span>, beheer hier de instellingen voor deze chat.</p>
+
+    <div class="card">
+        <h3>🛡️ Groepsbeveiliging</h3>
+        <div class="setting-row">
+            <span>Nieuwe leden Captcha</span>
+            <label class="switch"><input type="checkbox" id="toggleCaptcha"><span class="slider"></span></label>
+        </div>
+        <div class="setting-row">
+            <span>Welkomstbericht sturen</span>
+            <label class="switch"><input type="checkbox" id="toggleWelcome" checked><span class="slider"></span></label>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>⚔️ Raid Instellingen</h3>
+        <label for="raidTarget">Huidige Raid Target (X/Twitter link):</label>
+        <input type="text" id="raidTarget" placeholder="https://x.com/...">
+    </div>
+
+    <div class="card">
+        <h3>🎁 Acties</h3>
+        <div class="setting-row">
+            <span>Start een Giveaway</span>
+            <label class="switch"><input type="checkbox" id="toggleGiveaway"><span class="slider"></span></label>
+        </div>
+    </div>
+
+    <button class="main-btn" onclick="saveSettings()">💾 Opslaan & Doorsturen naar Bot</button>
+
+    <script>
+        // Initieer Telegram Web App
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Zorgt dat de app direct groot opent
+
+        // Vul de naam van de admin in
+        if(tg.initDataUnsafe && tg.initDataUnsafe.user) {
+            document.getElementById('userName').innerText = tg.initDataUnsafe.user.first_name;
+        }
+
+        // Functie die wordt uitgevoerd bij klikken op "Opslaan"
+        function saveSettings() {
+            // Verzamel alle data uit de formulieren
+            const settingsData = {
+                action: "SAVE_SETTINGS",
+                captcha_active: document.getElementById('toggleCaptcha').checked,
+                welcome_active: document.getElementById('toggleWelcome').checked,
+                raid_target: document.getElementById('raidTarget').value,
+                trigger_giveaway: document.getElementById('toggleGiveaway').checked
+            };
+
+            // Stuur de data als een JSON string terug naar jouw Python bot
+            tg.sendData(JSON.stringify(settingsData));
+            
+            // Sluit de Mini App
+            tg.close();
+        }
+    </script>
+</body>
+</html>

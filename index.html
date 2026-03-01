@@ -1,129 +1,302 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Omnibo Pro Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omnibo Control Center</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root {
-            --bg-color: var(--tg-theme-bg-color, #ffffff);
-            --text-color: var(--tg-theme-text-color, #222222);
-            --hint-color: var(--tg-theme-hint-color, #999999);
-            --button-color: var(--tg-theme-button-color, #2481cc);
-            --button-text-color: var(--tg-theme-button-text-color, #ffffff);
-            --secondary-bg-color: var(--tg-theme-secondary-bg-color, #f0f0f0);
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--tg-theme-bg-color, #f4f4f5);
+            color: var(--tg-theme-text-color, #000000);
+            margin: 0;
+            padding: 0;
         }
-        body { font-family: sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 15px; }
-        h2 { margin-top: 0; font-size: 20px; }
-        
-        /* Tabbladen CSS */
-        .tabs { display: flex; border-bottom: 2px solid var(--secondary-bg-color); margin-bottom: 15px; }
-        .tab { flex: 1; text-align: center; padding: 10px; cursor: pointer; color: var(--hint-color); font-weight: bold; }
-        .tab.active { color: var(--button-color); border-bottom: 2px solid var(--button-color); }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-
-        .card { background-color: var(--secondary-bg-color); border-radius: 8px; padding: 15px; margin-bottom: 15px; }
-        .setting-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        
-        input[type="text"], textarea { 
-            width: 100%; padding: 10px; margin-top: 5px; margin-bottom: 10px; 
-            border: 1px solid var(--hint-color); border-radius: 6px; 
-            background-color: var(--bg-color); color: var(--text-color); box-sizing: border-box; 
+        .header {
+            background-color: var(--tg-theme-secondary-bg-color, #ffffff);
+            padding: 15px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            border-bottom: 1px solid var(--tg-theme-hint-color, #ccc);
         }
-        textarea { resize: vertical; height: 80px; }
-
-        /* Toggle Switch */
-        .switch { position: relative; display: inline-block; width: 40px; height: 24px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
-        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: var(--button-color); }
-        input:checked + .slider:before { transform: translateX(16px); }
-
-        .main-btn { background-color: var(--button-color); color: var(--button-text-color); border: none; border-radius: 8px; padding: 14px; width: 100%; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .tabs {
+            display: flex;
+            background-color: var(--tg-theme-secondary-bg-color, #ffffff);
+            border-bottom: 1px solid var(--tg-theme-hint-color, #ccc);
+        }
+        .tab {
+            flex: 1;
+            text-align: center;
+            padding: 12px 0;
+            cursor: pointer;
+            color: var(--tg-theme-hint-color, #999);
+            font-weight: 600;
+            transition: 0.3s;
+        }
+        .tab.active {
+            color: var(--tg-theme-button-color, #3390ec);
+            border-bottom: 3px solid var(--tg-theme-button-color, #3390ec);
+        }
+        .tab-content {
+            display: none;
+            padding: 20px;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 5px;
+            color: var(--tg-theme-text-color, #000);
+            font-weight: 500;
+        }
+        input[type="text"], textarea, select {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            border: 1px solid var(--tg-theme-hint-color, #ccc);
+            border-radius: 8px;
+            background-color: var(--tg-theme-bg-color, #fff);
+            color: var(--tg-theme-text-color, #000);
+            font-size: 14px;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        .toggle-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 500;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+        /* iOS style toggle switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+        .switch input { 
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: var(--tg-theme-button-color, #3390ec);
+        }
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+        .info-text {
+            font-size: 12px;
+            color: var(--tg-theme-hint-color, #999);
+            margin-top: -5px;
+            margin-bottom: 10px;
+            display: block;
+        }
     </style>
 </head>
 <body>
 
-    <h2>⚙️ Bot Dashboard</h2>
+    <div class="header">Omnibo Control Center</div>
 
     <div class="tabs">
-        <div class="tab active" onclick="showTab('tab-general')">Algemeen</div>
-        <div class="tab" onclick="showTab('tab-content')">Teksten & Media</div>
-        <div class="tab" onclick="showTab('tab-tools')">Tools</div>
+        <div class="tab active" onclick="switchTab('crypto')">Crypto</div>
+        <div class="tab" onclick="switchTab('community')">Community</div>
+        <div class="tab" onclick="switchTab('security')">Security</div>
     </div>
 
-    <div id="tab-general" class="tab-content active">
-        <div class="card">
-            <div class="setting-row">
-                <span>🛡️ Nieuwe leden Captcha</span>
-                <label class="switch"><input type="checkbox" id="toggleCaptcha"><span class="slider"></span></label>
-            </div>
-            <div class="setting-row">
-                <span>👋 Welkomstbericht sturen</span>
-                <label class="switch"><input type="checkbox" id="toggleWelcome" checked><span class="slider"></span></label>
-            </div>
+    <div id="crypto" class="tab-content active">
+        <label class="toggle-label">
+            Enable BuyBot
+            <label class="switch"><input type="checkbox" id="buybot_active"><span class="slider"></span></label>
+        </label>
+        
+        <div class="form-group" style="margin-top: 15px;">
+            <label>BuyBot Contract Address (CA)</label>
+            <input type="text" id="buybot_ca" placeholder="0x...">
+        </div>
+
+        <div class="form-group">
+            <label>Active Raid Link (Twitter/X)</label>
+            <input type="text" id="raid_link" placeholder="https://x.com/...">
+        </div>
+
+        <label class="toggle-label" style="margin-top: 20px;">
+            Enable Governance Module
+            <label class="switch"><input type="checkbox" id="gov_auth"><span class="slider"></span></label>
+        </label>
+        <span class="info-text">Allows community to vote on proposals.</span>
+
+        <div class="form-group">
+            <label>Governance URL / Info</label>
+            <input type="text" id="gov_url" placeholder="Link to DAO or Snapshot">
         </div>
     </div>
 
-    <div id="tab-content" class="tab-content">
-        <div class="card">
-            <label for="welcomeText"><b>💬 Custom Welkomstbericht:</b> (gebruik {user} voor de naam)</label>
-            <textarea id="welcomeText" placeholder="Welkom in de groep, {user}!"></textarea>
-
-            <label for="welcomeGif"><b>🖼️ Welkomst GIF/Video (URL link):</b></label>
-            <input type="text" id="welcomeGif" placeholder="https://tenor.com/view/...">
-            
-            <label for="rulesText"><b>📜 Groepsregels:</b></label>
-            <textarea id="rulesText" placeholder="1. Geen spam&#10;2. Geen FUD..."></textarea>
+    <div id="community" class="tab-content">
+        <label class="toggle-label">
+            Welcome Messages
+            <label class="switch"><input type="checkbox" id="welcome_active"><span class="slider"></span></label>
+        </label>
+        
+        <div class="form-group" style="margin-top: 10px;">
+            <label>Welcome Message Text</label>
+            <textarea id="welcome_msg" placeholder="Welcome {user} to the group!"></textarea>
         </div>
+
+        <div class="form-group">
+            <label>Welcome Media URL (Image/GIF)</label>
+            <input type="text" id="welcome_anim" placeholder="https://link.to/image.jpg">
+        </div>
+
+        <div class="form-group">
+            <label>Group Rules</label>
+            <textarea id="rules_text" placeholder="1. No spam..."></textarea>
+        </div>
+
+        <label class="toggle-label" style="margin-top: 20px;">
+            Auto-Translate Messages
+            <label class="switch"><input type="checkbox" id="auto_trans"><span class="slider"></span></label>
+        </label>
+        
+        <div class="form-group">
+            <label>Target Language</label>
+            <select id="target_lang">
+                <option value="en">English (EN)</option>
+                <option value="nl">Dutch (NL)</option>
+                <option value="es">Spanish (ES)</option>
+                <option value="fr">French (FR)</option>
+                <option value="de">German (DE)</option>
+                <option value="zh-CN">Chinese (CN)</option>
+            </select>
+        </div>
+
+        <label class="toggle-label">
+            Quiz Module (Trivia)
+            <label class="switch"><input type="checkbox" id="quiz_active"><span class="slider"></span></label>
+        </label>
+
+        <label class="toggle-label">
+            Bored Module (/bored)
+            <label class="switch"><input type="checkbox" id="bored_active"><span class="slider"></span></label>
+        </label>
     </div>
 
-    <div id="tab-tools" class="tab-content">
-        <div class="card">
-            <label for="raidTarget"><b>⚔️ Huidige Raid Target (X link):</b></label>
-            <input type="text" id="raidTarget" placeholder="https://x.com/...">
-        </div>
-        <div class="card">
-            <div class="setting-row">
-                <span>🎁 Forceer Giveaway Start</span>
-                <label class="switch"><input type="checkbox" id="toggleGiveaway"><span class="slider"></span></label>
-            </div>
-        </div>
-    </div>
+    <div id="security" class="tab-content">
+        <label class="toggle-label">
+            Anti-Spam Filter
+            <label class="switch"><input type="checkbox" id="anti_spam"><span class="slider"></span></label>
+        </label>
+        <span class="info-text">Automatically bans users posting malicious links.</span>
 
-    <button class="main-btn" onclick="saveSettings()">💾 Opslaan & Doorsturen</button>
+        <label class="toggle-label">
+            Anti-Flood
+            <label class="switch"><input type="checkbox" id="anti_flood"><span class="slider"></span></label>
+        </label>
+        <span class="info-text">Mutes users sending more than 5 messages in 5 seconds.</span>
+
+        <label class="toggle-label">
+            Abusive Language Filter
+            <label class="switch"><input type="checkbox" id="anti_swear"><span class="slider"></span></label>
+        </label>
+        <span class="info-text">Warns and mutes users for using profanity.</span>
+
+        <label class="toggle-label">
+            Anti-Scammer (CAS API)
+            <label class="switch"><input type="checkbox" id="anti_scam"><span class="slider"></span></label>
+        </label>
+        <span class="info-text">Automatically bans known scammers upon joining.</span>
+
+        <label class="toggle-label">
+            Captcha on Join
+            <label class="switch"><input type="checkbox" id="captcha_active"><span class="slider"></span></label>
+        </label>
+        <span class="info-text">Forces new users to solve a captcha before speaking.</span>
+    </div>
 
     <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
+        let tg = window.Telegram.WebApp;
+        tg.expand(); // Zorgt dat de webapp fullscreen opent
 
-        // Simpele functie om tussen tabs te wisselen
-        function showTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+        // Haal het Chat ID op uit de URL (die we meesturen via de knop)
+        const urlParams = new URLSearchParams(window.location.search);
+        const chatId = urlParams.get('chat_id');
+
+        // Toon de main knop van Telegram
+        tg.MainButton.text = "SAVE SETTINGS";
+        tg.MainButton.show();
+
+        // Tab navigatie
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            document.querySelector(`.tab[onclick="switchTab('${tabId}')"]`).classList.add('active');
             document.getElementById(tabId).classList.add('active');
-            event.target.classList.add('active');
         }
 
-        // Opslaan functie
-        function saveSettings() {
-            const settingsData = {
-                action: "SAVE_SETTINGS",
-                captcha_active: document.getElementById('toggleCaptcha').checked,
-                welcome_active: document.getElementById('toggleWelcome').checked,
-                welcome_text: document.getElementById('welcomeText').value, // NIEUW
-                welcome_gif: document.getElementById('welcomeGif').value,   // NIEUW
-                rules_text: document.getElementById('rulesText').value,     // NIEUW
-                raid_target: document.getElementById('raidTarget').value,
-                trigger_giveaway: document.getElementById('toggleGiveaway').checked
+        // Als de gebruiker op opslaan klikt
+        tg.MainButton.onClick(function() {
+            // Verzamel alle data
+            const data = {
+                chat_id: chatId,
+                // Crypto
+                buybot_active: document.getElementById('buybot_active').checked ? 1 : 0,
+                buybot_ca: document.getElementById('buybot_ca').value,
+                raid_link: document.getElementById('raid_link').value,
+                gov_auth: document.getElementById('gov_auth').checked ? 1 : 0,
+                gov_url: document.getElementById('gov_url').value,
+                
+                // Community
+                welcome_active: document.getElementById('welcome_active').checked ? 1 : 0,
+                welcome_msg: document.getElementById('welcome_msg').value,
+                welcome_anim: document.getElementById('welcome_anim').value,
+                rules_text: document.getElementById('rules_text').value,
+                auto_trans: document.getElementById('auto_trans').checked ? 1 : 0,
+                target_lang: document.getElementById('target_lang').value,
+                quiz_active: document.getElementById('quiz_active').checked ? 1 : 0,
+                bored_active: document.getElementById('bored_active').checked ? 1 : 0,
+
+                // Security
+                anti_spam: document.getElementById('anti_spam').checked ? 1 : 0,
+                anti_flood: document.getElementById('anti_flood').checked ? 1 : 0,
+                anti_swear: document.getElementById('anti_swear').checked ? 1 : 0,
+                anti_scam: document.getElementById('anti_scam').checked ? 1 : 0,
+                captcha_active: document.getElementById('captcha_active').checked ? 1 : 0
             };
 
-            tg.sendData(JSON.stringify(settingsData));
-            tg.close();
-        }
+            // Stuur data terug naar de bot
+            tg.sendData(JSON.stringify(data));
+        });
     </script>
 </body>
 </html>

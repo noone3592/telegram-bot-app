@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Space Invaders</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            color: #fff;
+            font-family: 'Courier New', Courier, monospace;
+            text-align: center;
+            overflow: hidden; /* Voorkom scrollen op mobiel */
+        }
+        #gameCanvas {
+            background-color: #111;
+            display: block;
+            margin: 0 auto;
+            max-width: 100%;
+        }
+        #ui {
+            padding: 10px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        #gameOverScreen {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border: 2px solid #0f0;
+            border-radius: 10px;
+            width: 80%;
+        }
+        button {
+            background-color: #0f0;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 15px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui">Score: <span id="scoreText">0</span></div>
+    
+    <canvas id="gameCanvas" width="320" height="480"></canvas>
+
+    <div id="gameOverScreen">
+        <h2>GAME OVER</h2>
+        <p>Jouw score: <span id="finalScore">0</span></p>
+        <p id="sendingText">Score opslaan in Telegram...</p>
+        <button onclick="location.reload()">Opnieuw Spelen</button>
+    </div>
+
+    <script>
+        // Initialiseer Telegram Web App
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Zorg dat de app het hele scherm vult
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreText = document.getElementById('scoreText');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const finalScoreText = document.getElementById('finalScore');
+
+        // Game Variabelen
+        let score = 0;
+        let isGameOver = false;
+        let frameCount = 0;
+
+        // Speler (Jouw schip)
+        const player = {
+            x: canvas.width / 2 - 15,
+            y: canvas.height - 40,
+            width: 30,
+            height: 30,
+            color: '#0f0'
+        };
+
+        // Arrays voor kogels en vijanden
+        let bullets = [];
+        let enemies = [];
+
+        // Besturing (Mobiel Touch & Muis)
+        function movePlayer(clientX) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            let newX = (clientX - rect.left) * scaleX - player.width / 2;
+            
+            // Houd de speler binnen het scherm
+            if (newX < 0) newX = 0;
+            if (newX + player.width > canvas.width) newX = canvas.width - player.width;
+            player.x = newX;
+        }
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault(); // Voorkom scrollen
+            movePlayer(e.touches[0].clientX);
+        }, { passive: false });
+
+        canvas.addEventListener('mousemove', (e) => {
+            movePlayer(e.clientX);
+        });
+
+        // Spawn Vijanden
+        function spawnEnemies() {
+            const rows = 3;
+            const cols = 6;
+            for(let r = 0; r < rows; r++) {
+                for(let c = 0; c < cols; c++) {
+                    enemies.push({
+                        x: 20 + c * 40,
+                        y: 30 + r * 40,
+                        width: 25,
+                        height: 25,
+                        color: '#f00',
+                        dx: 1, // Snelheid naar links/rechts
+                        dy: 0.1 // Snelheid naar beneden
+                    });
+                }
+            }
+        }
+
+        // Game Loop updaten
+        function update() {
+            if (isGameOver) return;
+
+            frameCount++;
+
+            // Automatisch schieten (elke 20 frames)
+            if (frameCount % 20 === 0) {
+                bullets.push({
+                    x: player.x + player.width / 2 - 2,
+                    y: player.y,
+                    width: 4,
+                    height: 10,
+                    color: '#ff0',
+                    dy: -5
+                });
+            }
+
+            // Update kogels
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                bullets[i].y += bullets[i].dy;
+                if (bullets[i].y < 0) bullets.splice(i, 1); // Verwijder kogels buiten scherm
+            }
+
+            // Update vijanden & collision detectie
+            let reverse = false;
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                let e = enemies[i];
+                e.x += e.dx;
+                e.y += e.dy;
+
+                // Draai om als de rand wordt geraakt
+                if (e.x <= 0 || e.x + e.width >= canvas.width) {
+                    reverse = true;
+                }
+
+                // Check of vijand speler raakt (Game Over)
+                if (e.y + e.height > player.y && e.x < player.x + player.width && e.x + e.width > player.x) {
+                    endGame();
+                }
+
+                // Check kogel hits
+                for (let j = bullets.length - 1; j >= 0; j--) {
+                    let b = bullets[j];
+                    if (b.x < e.x + e.width && b.x + b.width > e.x && b.y < e.y + e.height && b.y + b.height > e.y) {
+                        // Geraakt!
+                        enemies.splice(i, 1);
+                        bullets.splice(j, 1);
+                        score += 10;
+                        scoreText.innerText = score;
+                        break;
+                    }
+                }
+                
+                // Als vijand de bodem raakt (Game Over)
+                if (e && e.y + e.height > canvas.height) {
+                    endGame();
+                }
+            }
+
+            // Laat alle vijanden van richting veranderen als er eentje de rand raakt
+            if (reverse) {
+                enemies.forEach(e => {
+                    e.dx *= -1;
+                    e.y += 10; // Zak een stukje naar beneden
+                });
+            }
+
+            // Als alle vijanden dood zijn, spawn nieuwe (moeilijker!)
+            if (enemies.length === 0) {
+                spawnEnemies();
+                // Verhoog de snelheid van de nieuwe lichting
+                enemies.forEach(e => { e.dx *= 1.5; e.dy *= 1.2; });
+            }
+        }
+
+        // Teken alles op het scherm
+        function draw() {
+            // Wis scherm
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Teken Speler
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+
+            // Teken Kogels
+            bullets.forEach(b => {
+                ctx.fillStyle = b.color;
+                ctx.fillRect(b.x, b.y, b.width, b.height);
+            });
+
+            // Teken Vijanden
+            enemies.forEach(e => {
+                ctx.fillStyle = e.color;
+                ctx.fillRect(e.x, e.y, e.width, e.height);
+            });
+        }
+
+        // De main game loop
+        function gameLoop() {
+            if (!isGameOver) {
+                update();
+                draw();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // Functie die afgevuurd wordt bij Game Over
+        function endGame() {
+            isGameOver = true;
+            gameOverScreen.style.display = 'block';
+            finalScoreText.innerText = score;
+
+            // STUUR DATA NAAR TELEGRAM BOT!
+            try {
+                let payload = {
+                    action: 'save_score',
+                    game_name: 'space_invaders',
+                    score: score
+                };
+                // tg.sendData stuurt de payload direct naar de handle_webapp_data in je Python code!
+                tg.sendData(JSON.stringify(payload));
+            } catch (error) {
+                console.log("Kon score niet naar Telegram sturen (open je dit in een browser?)", error);
+                document.getElementById('sendingText').innerText = "Score kon niet worden opgeslagen (Niet in Telegram).";
+            }
+        }
+
+        // Start het spel
+        spawnEnemies();
+        gameLoop();
+    </script>
+</body>
+</html>

@@ -4,92 +4,83 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
     <title>Connect Phantom</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { margin: 0; background: #121212; color: #fff; font-family: sans-serif; text-align: center; padding: 50px 20px; }
-        .box { background: #1e1e1e; padding: 30px; border-radius: 15px; max-width: 400px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        h2 { margin-top: 0; color: #ab9ff2; }
-        .phantom-btn { background: #ab9ff2; color: #000; font-size: 18px; font-weight: bold; border: none; padding: 15px 30px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 10px; margin-top: 20px; width: 100%; }
-        .phantom-btn:hover { background: #9580ff; }
-        .phantom-btn img { width: 24px; height: 24px; }
-        #status { margin-top: 20px; color: #aaa; font-size: 14px; word-wrap: break-word; }
+        body { background: #121212; color: #fff; font-family: sans-serif; text-align: center; padding: 30px 20px; }
+        h2 { color: #ab9ff2; }
+        .btn { background: #ab9ff2; color: #000; font-size: 18px; font-weight: bold; border: none; padding: 15px; border-radius: 8px; width: 100%; margin-top: 20px; cursor: pointer; }
+        .btn:active { background: #9580ff; }
+        #status { margin-top: 20px; color: #ffeb3b; font-size: 16px; font-weight: bold; word-wrap: break-word; }
+        #debug { margin-top: 40px; font-size: 12px; color: #0f0; text-align: left; background: #222; padding: 15px; border-radius: 8px; font-family: monospace; }
     </style>
 </head>
 <body>
-    <div class="box">
-        <h2>Premium Verification</h2>
-        <p>Connect your Phantom wallet to verify your token balance.</p>
-        
-        <button class="phantom-btn" onclick="connectPhantom()">
-            <img src="https://phantom.app/img/logo.png" alt="Phantom" onerror="this.style.display='none'">
-            Connect Wallet
-        </button>
-
-        <p id="status"></p>
-    </div>
+    <h2>Premium Verification</h2>
+    <p>Klik hieronder om je wallet veilig te koppelen.</p>
+    
+    <button class="btn" onclick="doConnect()">🔗 Connect Phantom</button>
+    
+    <p id="status">Wachten op actie...</p>
+    
+    <div id="debug">System check wordt gestart...</div>
 
     <script>
-        // VEILIGE TELEGRAM INIT: Voorkomt crashes in de Phantom App!
+        // Veilige Telegram opstart
         let tg = null;
-        try {
-            if (window.Telegram && window.Telegram.WebApp) {
-                tg = window.Telegram.WebApp;
-                tg.expand();
-            }
-        } catch (e) {
-            console.log("Not running inside Telegram");
-        }
+        try { tg = window.Telegram.WebApp; tg.expand(); } catch(e) {}
 
-        const MY_WEBAPP_URL = "https://noone3592.github.io/telegram-bot-app/wallet.html"; 
-        const BOT_USERNAME = "Omni_V1_Bot";
-        const statusText = document.getElementById('status');
+        const BOT_URL = "https://t.me/Omni_V1_Bot";
+        const MY_URL = "https://noone3592.github.io/telegram-bot-app/wallet.html";
 
-        window.onload = () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('auto') === 'true') {
-                statusText.innerText = "Preparing Phantom connection...";
-                // We wachten 1 seconde zodat Phantom zijn in-app provider kan inladen!
-                setTimeout(connectPhantom, 1000);
-            }
-        };
+        // Elke seconde checken we of de Phantom App de pagina goed heeft ingeladen
+        setInterval(() => {
+            const hasPhantom = !!(window.phantom && window.phantom.solana);
+            document.getElementById('debug').innerHTML = `
+                STATUS UPDATE:<br>
+                ----------------<br>
+                Phantom Injected : ${hasPhantom ? '✅ YES' : '❌ NO'}<br>
+                Platform         : ${tg ? 'Telegram' : 'Browser/Phantom'}<br>
+            `;
+        }, 1000);
 
-        async function connectPhantom() {
-            try {
-                const provider = window.phantom?.solana;
-                
-                if (provider && provider.isPhantom) {
-                    statusText.innerText = "Phantom found! Requesting access...";
+        async function doConnect() {
+            const status = document.getElementById('status');
+            status.innerText = "Knop ingedrukt, laden...";
+            
+            const provider = window.phantom ? window.phantom.solana : null;
+            
+            // SCENARIO 1: We zitten IN de Phantom App (of op de PC met extensie)
+            if (provider && provider.isPhantom) {
+                status.innerText = "Phantom gevonden! Bevestig de pop-up...";
+                try {
                     const resp = await provider.connect();
-                    const walletAddress = resp.publicKey.toString();
+                    const wallet = resp.publicKey.toString();
                     
-                    statusText.style.color = "#0f0";
-                    statusText.innerText = "Success! Redirecting to bot...";
+                    status.style.color = "#0f0";
+                    status.innerText = "Gelukt! Je wordt nu teruggestuurd...";
                     
-                    if (tg && tg.initDataUnsafe && Object.keys(tg.initDataUnsafe).length > 0) {
-                        tg.sendData(JSON.stringify({ action: 'link_wallet', wallet: walletAddress }));
-                    } else {
-                        window.location.href = `https://t.me/${BOT_USERNAME}?start=wallet_${walletAddress}`;
-                    }
-                } else {
-                    statusText.innerText = "Redirecting to Phantom App...";
+                    // Schiet de gebruiker terug naar de Telegram Bot
+                    setTimeout(() => {
+                        window.location.href = `${BOT_URL}?start=wallet_${wallet}`;
+                    }, 1000);
                     
-                    const myUrlWithParam = MY_WEBAPP_URL + "?auto=true";
-                    const encodedUrl = encodeURIComponent(myUrlWithParam);
-                    const deepLink = `https://phantom.app/ul/browse/${encodedUrl}?ref=${encodedUrl}`;
-                    
-                    if (tg && tg.openLink) {
-                        tg.openLink(deepLink); 
-                    } else {
-                        window.location.href = deepLink; 
-                    }
+                } catch (err) {
+                    status.style.color = "#f00";
+                    status.innerText = "Fout: " + err.message;
                 }
-            } catch (err) {
-                // Als het nu misgaat, zien we de rode error tekst direct op het scherm!
-                statusText.style.color = "#f00";
-                statusText.innerText = "Error: " + (err.message || "Connection rejected.");
+            } 
+            // SCENARIO 2: We zitten in Telegram op de mobiel
+            else {
+                status.innerText = "Openen in Phantom App...";
+                const encodedUrl = encodeURIComponent(MY_URL);
+                const deepLink = `https://phantom.app/ul/browse/${encodedUrl}?ref=${encodedUrl}`;
+                
+                if (tg && tg.openLink) {
+                    tg.openLink(deepLink);
+                } else {
+                    window.location.href = deepLink;
+                }
             }
         }
     </script>

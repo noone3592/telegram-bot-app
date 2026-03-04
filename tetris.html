@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tetris</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { margin: 0; background: #000; color: #fff; font-family: monospace; text-align: center; overflow: hidden; }
+        canvas { background: #111; display: block; margin: 5px auto; border: 2px solid #555; }
+        #ui { padding: 5px; font-size: 18px; }
+        .controls { margin-top: 10px; display: flex; justify-content: center; gap: 10px; }
+        .btn { background: #333; color: #fff; border: 1px solid #555; border-radius: 5px; width: 60px; height: 50px; font-size: 20px; user-select: none; }
+        .btn:active { background: #777; }
+        #gameOver { display: none; position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 20px; border: 2px solid #f00; border-radius: 10px; width: 80%; }
+        button.retry { background: #f00; color: #fff; padding: 10px; font-size: 16px; margin-top: 10px; border: none; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="ui">Score: <span id="scoreText">0</span></div>
+    <canvas id="gameCanvas" width="200" height="400"></canvas>
+    
+    <div class="controls">
+        <button class="btn" onclick="move(-1)">⬅️</button>
+        <button class="btn" onclick="rotate()">🔄</button>
+        <button class="btn" onclick="move(1)">➡️</button>
+        <button class="btn" onclick="drop()">⬇️</button>
+    </div>
+
+    <div id="gameOver">
+        <h2>GAME OVER</h2>
+        <p>Score: <span id="finalScore">0</span></p>
+        <p id="sending">Verzenden naar Telegram...</p>
+        <button class="retry" onclick="location.reload()">Opnieuw</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp; tg.expand();
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const ROWS = 20, COLS = 10, SQ = 20;
+        let score = 0, isGameOver = false;
+        
+        // Speelveld
+        let board = Array.from({length: ROWS}, () => Array(COLS).fill(""));
+
+        // Tetromino shapes & colors
+        const PIECES = [
+            [[[1,1,1,1]], "cyan"], // I
+            [[[1,0,0],[1,1,1]], "blue"], // J
+            [[[0,0,1],[1,1,1]], "orange"], // L
+            [[[1,1],[1,1]], "yellow"], // O
+            [[[0,1,1],[1,1,0]], "green"], // S
+            [[[0,1,0],[1,1,1]], "purple"], // T
+            [[[1,1,0],[0,1,1]], "red"] // Z
+        ];
+
+        let piece, x, y;
+
+        function randomPiece() {
+            let r = Math.floor(Math.random() * PIECES.length);
+            piece = PIECES[r][0];
+            color = PIECES[r][1];
+            x = 3; y = 0;
+            if(collision(0,0,piece)) over();
+        }
+
+        function drawSquare(x, y, color) {
+            ctx.fillStyle = color; ctx.fillRect(x*SQ, y*SQ, SQ, SQ);
+            ctx.strokeStyle = "#000"; ctx.strokeRect(x*SQ, y*SQ, SQ, SQ);
+        }
+
+        function drawBoard() {
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            for(let r=0; r<ROWS; r++){
+                for(let c=0; c<COLS; c++){
+                    if(board[r][c]) drawSquare(c, r, board[r][c]);
+                }
+            }
+        }
+
+        function drawPiece() {
+            for(let r=0; r<piece.length; r++){
+                for(let c=0; c<piece[r].length; c++){
+                    if(piece[r][c]) drawSquare(x+c, y+r, color);
+                }
+            }
+        }
+
+        function collision(nx, ny, p) {
+            for(let r=0; r<p.length; r++){
+                for(let c=0; c<p[r].length; c++){
+                    if(!p[r][c]) continue;
+                    let newX = x + c + nx, newY = y + r + ny;
+                    if(newX < 0 || newX >= COLS || newY >= ROWS) return true; // Randen
+                    if(newY < 0) continue;
+                    if(board[newY][newX]) return true; // Andere blokjes
+                }
+            }
+            return false;
+        }
+
+        function lock() {
+            for(let r=0; r<piece.length; r++){
+                for(let c=0; c<piece[r].length; c++){
+                    if(!piece[r][c]) continue;
+                    if(y+r < 0) return over();
+                    board[y+r][x+c] = color;
+                }
+            }
+            // Check voor volle rijen
+            for(let r=0; r<ROWS; r++){
+                let isFull = true;
+                for(let c=0; c<COLS; c++) { if(!board[r][c]) isFull = false; }
+                if(isFull) {
+                    board.splice(r, 1);
+                    board.unshift(Array(COLS).fill(""));
+                    score += 100;
+                    document.getElementById('scoreText').innerText = score;
+                }
+            }
+            randomPiece();
+        }
+
+        function move(dir) { if(!isGameOver && !collision(dir, 0, piece)) { x += dir; drawBoard(); drawPiece(); } }
+        function drop() { if(!isGameOver) { if(!collision(0, 1, piece)) y++; else lock(); drawBoard(); drawPiece(); } }
+        function rotate() {
+            if(isGameOver) return;
+            let nextPattern = piece[0].map((val, index) => piece.map(row => row[index]).reverse());
+            if(!collision(0,0, nextPattern)) { piece = nextPattern; drawBoard(); drawPiece(); }
+        }
+
+        function over() {
+            isGameOver = true;
+            document.getElementById('gameOver').style.display = 'block';
+            document.getElementById('finalScore').innerText = score;
+            try { tg.sendData(JSON.stringify({action: 'save_score', game_name: 'tetris', score: score})); } 
+            catch(e) { document.getElementById('sending').innerText = 'Niet in Telegram'; }
+        }
+
+        let dropStart = Date.now();
+        function update() {
+            if(isGameOver) return;
+            let now = Date.now();
+            let delta = now - dropStart;
+            if(delta > 500) { drop(); dropStart = Date.now(); } // Snelheid van vallen
+            requestAnimationFrame(update);
+        }
+
+        randomPiece(); update();
+    </script>
+</body>
+</html>

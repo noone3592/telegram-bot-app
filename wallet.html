@@ -32,18 +32,14 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        // Jouw specifieke gegevens zijn hier ingevuld!
         const MY_WEBAPP_URL = "https://noone3592.github.io/telegram-bot-app/wallet.html"; 
         const BOT_USERNAME = "Omni_V1_Bot";
 
         async function connectPhantom() {
             const statusText = document.getElementById('status');
-            
-            // Check of Phantom beschikbaar is (PC Extensie of in de Phantom App zelf)
             const provider = window.phantom?.solana;
             
             if (provider?.isPhantom) {
-                // SCENARIO 1: Phantom is gevonden! We verbinden direct. (PC of in de in-app browser van Phantom)
                 try {
                     statusText.innerText = "Requesting connection...";
                     const resp = await provider.connect();
@@ -52,24 +48,28 @@
                     statusText.style.color = "#0f0";
                     statusText.innerText = "Connected! Returning to Telegram...";
                     
-                    // Als we in de Telegram desktop/web app zitten, stuur data onzichtbaar terug
-                    if (tg.initData) {
+                    // Als we initData hebben, zitten we in de PC Telegram
+                    if (tg.initDataUnsafe && Object.keys(tg.initDataUnsafe).length > 0) {
                         tg.sendData(JSON.stringify({ action: 'link_wallet', wallet: walletAddress }));
                     } else {
-                        // Als we op mobiel via de Phantom browser zitten, sturen we je via een link terug naar de bot
+                        // Anders zitten we in de Phantom App browser! Stuur ons terug naar de bot.
                         window.location.href = `https://t.me/${BOT_USERNAME}?start=wallet_${walletAddress}`;
                     }
-                    
                 } catch (err) {
                     statusText.style.color = "#f00";
                     statusText.innerText = "Connection rejected.";
                 }
             } else {
-                // SCENARIO 2: Mobiele telefoon in Telegram WebView. Geen Phantom extensie gevonden.
-                // We sturen de telefoon naar de Phantom App Browser via een Deep Link!
+                // HIER ZIT DE MAGIE: Gebruik tg.openLink om Telegram te forceren de Phantom App te openen
                 statusText.innerText = "Opening Phantom App...";
                 const encodedUrl = encodeURIComponent(MY_WEBAPP_URL);
-                window.location.href = `https://phantom.app/ul/browse/${encodedUrl}?ref=${encodedUrl}`;
+                const deepLink = `https://phantom.app/ul/browse/${encodedUrl}?ref=${encodedUrl}`;
+                
+                try {
+                    tg.openLink(deepLink); // Officiële Telegram WebApp routing
+                } catch (e) {
+                    window.location.href = deepLink; // Fallback
+                }
             }
         }
     </script>

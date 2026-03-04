@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sudoku</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { margin: 0; background: #e0e0e0; font-family: sans-serif; text-align: center; }
+        h2 { margin: 10px 0; color: #333; }
+        #board { display: grid; grid-template-columns: repeat(9, 1fr); max-width: 360px; margin: 0 auto; background: #000; border: 2px solid #000; gap: 1px; }
+        .cell { background: #fff; height: 38px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; cursor: pointer; user-select: none; }
+        /* Dikkere randen voor de 3x3 blokken */
+        .cell:nth-child(3n) { border-right: 2px solid #000; }
+        .cell:nth-child(9n) { border-right: none; }
+        .cell:nth-child(n+19):nth-child(-n+27), .cell:nth-child(n+46):nth-child(-n+54) { border-bottom: 2px solid #000; }
+        
+        .cell.fixed { color: #000; background: #eee; cursor: not-allowed; }
+        .cell.user { color: #2980b9; }
+        .cell.selected { background: #f1c40f; }
+        .cell.error { color: #e74c3c; background: #fce4e4; }
+        
+        #numpad { display: flex; justify-content: center; flex-wrap: wrap; max-width: 360px; margin: 15px auto; gap: 5px; }
+        .btn { background: #34495e; color: #fff; width: 50px; height: 50px; font-size: 24px; border: none; border-radius: 5px; cursor: pointer; }
+        .btn:active { background: #2c3e50; }
+        
+        #gameOver { display: none; margin-top: 20px; font-size: 20px; color: #27ae60; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h2>Tijd: <span id="time">0</span>s</h2>
+    <div id="board"></div>
+    
+    <div id="numpad">
+        <button class="btn" onclick="inputNum(1)">1</button>
+        <button class="btn" onclick="inputNum(2)">2</button>
+        <button class="btn" onclick="inputNum(3)">3</button>
+        <button class="btn" onclick="inputNum(4)">4</button>
+        <button class="btn" onclick="inputNum(5)">5</button>
+        <button class="btn" onclick="inputNum(6)">6</button>
+        <button class="btn" onclick="inputNum(7)">7</button>
+        <button class="btn" onclick="inputNum(8)">8</button>
+        <button class="btn" onclick="inputNum(9)">9</button>
+        <button class="btn" onclick="inputNum('')" style="width: 100px; background: #e74c3c;">Wis</button>
+    </div>
+
+    <div id="gameOver">
+        <p>🎉 Puzzel Opgelost! 🎉</p>
+        <p>Score: <span id="finalScore">0</span></p>
+        <p>Wordt opgeslagen in Telegram...</p>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp; tg.expand();
+        
+        // Een standaard Sudoku puzzel (0 = leeg)
+        const puzzle = [
+            5,3,0,0,7,0,0,0,0,
+            6,0,0,1,9,5,0,0,0,
+            0,9,8,0,0,0,0,6,0,
+            8,0,0,0,6,0,0,0,3,
+            4,0,0,8,0,3,0,0,1,
+            7,0,0,0,2,0,0,0,6,
+            0,6,0,0,0,0,2,8,0,
+            0,0,0,4,1,9,0,0,5,
+            0,0,0,0,8,0,0,7,9
+        ];
+        
+        let boardState = [...puzzle];
+        let selectedIndex = -1;
+        let timeSeconds = 0;
+        let timer = setInterval(() => { timeSeconds++; document.getElementById('time').innerText = timeSeconds; }, 1000);
+
+        const boardDiv = document.getElementById('board');
+
+        // Teken het bord
+        boardState.forEach((val, index) => {
+            let cell = document.createElement('div');
+            cell.classList.add('cell');
+            if (val !== 0) {
+                cell.innerText = val;
+                cell.classList.add('fixed');
+            } else {
+                cell.onclick = () => selectCell(index, cell);
+                cell.classList.add('user');
+            }
+            boardDiv.appendChild(cell);
+        });
+
+        const cells = document.querySelectorAll('.cell');
+
+        function selectCell(index, cellElement) {
+            cells.forEach(c => c.classList.remove('selected'));
+            cellElement.classList.add('selected');
+            selectedIndex = index;
+        }
+
+        function inputNum(num) {
+            if (selectedIndex === -1) return;
+            boardState[selectedIndex] = num === '' ? 0 : num;
+            cells[selectedIndex].innerText = num;
+            cells[selectedIndex].classList.remove('error'); // Verwijder eerdere fout visueel
+            checkWin();
+        }
+
+        function checkWin() {
+            // Check of het bord vol is
+            if (boardState.includes(0)) return;
+
+            // Als we hier zijn, is het bord vol. Nu controleren op fouten!
+            let isValid = validateBoard();
+
+            if (isValid) {
+                clearInterval(timer);
+                let score = Math.max(100, 10000 - (timeSeconds * 10)); // Hoe sneller, hoe beter!
+                document.getElementById('numpad').style.display = 'none';
+                document.getElementById('gameOver').style.display = 'block';
+                document.getElementById('finalScore').innerText = score;
+                
+                try { tg.sendData(JSON.stringify({action: 'save_score', game_name: 'sudoku', score: score})); } 
+                catch(e) { alert("Game Over! Score: " + score); }
+            } else {
+                // Als het vol is maar fout, laat even weten door alles rood te knipperen
+                cells.forEach(c => { if (c.classList.contains('user')) c.classList.add('error'); });
+            }
+        }
+
+        // Simpele functie om te checken of een Sudoku correct is opgelost
+        function validateBoard() {
+            for (let i = 0; i < 9; i++) {
+                let row = new Set(), col = new Set(), box = new Set();
+                for (let j = 0; j < 9; j++) {
+                    let r = boardState[i * 9 + j];
+                    let c = boardState[j * 9 + i];
+                    let b = boardState[(Math.floor(i / 3) * 3 + Math.floor(j / 3)) * 9 + (i % 3) * 3 + (j % 3)];
+                    
+                    if (row.has(r) || col.has(c) || box.has(b)) return false;
+                    row.add(r); col.add(c); box.add(b);
+                }
+            }
+            return true;
+        }
+    </script>
+</body>
+</html>

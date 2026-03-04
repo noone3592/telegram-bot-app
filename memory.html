@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Crypto Memory</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { margin: 0; background: #121212; color: #fff; font-family: sans-serif; text-align: center; }
+        #ui { padding: 15px; font-size: 20px; font-weight: bold; }
+        .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; max-width: 350px; margin: 0 auto; padding: 10px; }
+        .card { background: #2c3e50; border-radius: 8px; height: 80px; display: flex; align-items: center; justify-content: center; font-size: 40px; cursor: pointer; user-select: none; transition: background 0.3s; }
+        .card.flipped { background: #f39c12; }
+        .card.matched { background: #27ae60; cursor: default; }
+        #gameOver { display: none; margin-top: 20px; font-size: 24px; color: #2ecc71; }
+    </style>
+</head>
+<body>
+    <div id="ui">Score: <span id="scoreText">1000</span> | Fouten: <span id="mistakesText">0</span></div>
+    <div class="grid" id="grid"></div>
+    <div id="gameOver">
+        <h2>🎉 GEWONNEN! 🎉</h2>
+        <p>Jouw eindscore: <span id="finalScore">0</span></p>
+        <p>Wordt opgeslagen in Telegram...</p>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp; tg.expand();
+        
+        const symbols = ['₿', '₿', '💎', '💎', '🚀', '🚀', '🌕', '🌕', '📈', '📈', '💰', '💰', '🪙', '🪙', '💸', '💸'];
+        let cards = [];
+        let flippedCards = [];
+        let matchedCount = 0;
+        let score = 1000;
+        let mistakes = 0;
+
+        // Shuffle array
+        symbols.sort(() => 0.5 - Math.random());
+
+        const grid = document.getElementById('grid');
+
+        // Maak de kaarten aan
+        symbols.forEach((symbol, index) => {
+            let card = document.createElement('div');
+            card.classList.add('card');
+            card.dataset.symbol = symbol;
+            card.dataset.index = index;
+            card.onclick = () => flipCard(card);
+            grid.appendChild(card);
+            cards.push(card);
+        });
+
+        function flipCard(card) {
+            if (flippedCards.length >= 2 || card.classList.contains('flipped') || card.classList.contains('matched')) return;
+
+            card.classList.add('flipped');
+            card.innerText = card.dataset.symbol;
+            flippedCards.push(card);
+
+            if (flippedCards.length === 2) checkMatch();
+        }
+
+        function checkMatch() {
+            let [card1, card2] = flippedCards;
+            
+            if (card1.dataset.symbol === card2.dataset.symbol) {
+                // Match!
+                card1.classList.replace('flipped', 'matched');
+                card2.classList.replace('flipped', 'matched');
+                matchedCount += 2;
+                flippedCards = [];
+                
+                if (matchedCount === symbols.length) winGame();
+            } else {
+                // Geen match
+                mistakes++;
+                score = Math.max(100, score - 20); // Minpunten voor een fout
+                document.getElementById('mistakesText').innerText = mistakes;
+                document.getElementById('scoreText').innerText = score;
+                
+                setTimeout(() => {
+                    card1.classList.remove('flipped');
+                    card2.classList.remove('flipped');
+                    card1.innerText = '';
+                    card2.innerText = '';
+                    flippedCards = [];
+                }, 1000);
+            }
+        }
+
+        function winGame() {
+            document.getElementById('grid').style.display = 'none';
+            document.getElementById('gameOver').style.display = 'block';
+            document.getElementById('finalScore').innerText = score;
+            
+            try { tg.sendData(JSON.stringify({action: 'save_score', game_name: 'memory', score: score})); } 
+            catch(e) { alert("Game Over! Score kon niet naar Telegram worden verstuurd."); }
+        }
+    </script>
+</body>
+</html>

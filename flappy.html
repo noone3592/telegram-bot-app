@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Flappy Bird</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { margin: 0; background: #70c5ce; overflow: hidden; font-family: sans-serif; text-align: center; }
+        canvas { display: block; margin: 0 auto; background: #70c5ce; }
+        #ui { position: absolute; top: 10px; width: 100%; font-size: 24px; font-weight: bold; color: white; text-shadow: 2px 2px 0 #000; z-index: 10; pointer-events: none; }
+    </style>
+</head>
+<body onclick="jump()">
+    <div id="ui">Score: <span id="scoreText">0</span></div>
+    <canvas id="gameCanvas" width="320" height="480"></canvas>
+    <script>
+        const tg = window.Telegram.WebApp; tg.expand();
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let frames = 0, score = 0, isGameOver = false;
+        const bird = { x: 50, y: 150, width: 20, height: 20, gravity: 0.25, velocity: 0, jump: -4.6 };
+        const pipes = [];
+        
+        function jump() { if (!isGameOver) bird.velocity = bird.jump; }
+
+        function update() {
+            if (isGameOver) return;
+            frames++;
+            bird.velocity += bird.gravity;
+            bird.y += bird.velocity;
+
+            // Dood door vloer of plafond
+            if (bird.y + bird.height >= canvas.height || bird.y < 0) return over();
+
+            // Voeg buizen toe
+            if (frames % 100 === 0) {
+                let gapPosition = Math.floor(Math.random() * 200) + 50;
+                pipes.push({ x: canvas.width, y: gapPosition, width: 40, gap: 120 });
+            }
+
+            for (let i = pipes.length - 1; i >= 0; i--) {
+                let p = pipes[i];
+                p.x -= 2; // Snelheid buizen
+
+                // Check botsing
+                if (bird.x < p.x + p.width && bird.x + bird.width > p.x && 
+                    (bird.y < p.y || bird.y + bird.height > p.y + p.gap)) {
+                    return over();
+                }
+
+                // Score +1 als je er voorbij bent
+                if (p.x === 48) { score++; document.getElementById('scoreText').innerText = score; }
+
+                if (p.x + p.width < 0) pipes.splice(i, 1);
+            }
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#f2df24'; ctx.fillRect(bird.x, bird.y, bird.width, bird.height); // Bird
+            ctx.fillStyle = '#2ecc71'; // Pipes
+            pipes.forEach(p => {
+                ctx.fillRect(p.x, 0, p.width, p.y); // Top pipe
+                ctx.fillRect(p.x, p.y + p.gap, p.width, canvas.height - (p.y + p.gap)); // Bottom pipe
+            });
+        }
+
+        function over() {
+            isGameOver = true;
+            try { tg.sendData(JSON.stringify({action: 'save_score', game_name: 'flappy_bird', score: score})); } 
+            catch(e) { alert("Game Over! Score: " + score); }
+        }
+        
+        update();
+    </script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Connect Phantom</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { margin: 0; background: #121212; color: #fff; font-family: sans-serif; text-align: center; padding: 50px 20px; }
+        .box { background: #1e1e1e; padding: 30px; border-radius: 15px; max-width: 400px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        h2 { margin-top: 0; color: #ab9ff2; }
+        .phantom-btn { background: #ab9ff2; color: #000; font-size: 18px; font-weight: bold; border: none; padding: 15px 30px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; margin-top: 20px; }
+        .phantom-btn:hover { background: #9580ff; }
+        .phantom-btn img { width: 24px; height: 24px; }
+        #status { margin-top: 20px; color: #aaa; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>Premium Verification</h2>
+        <p>Connect your Phantom wallet to verify your token balance.</p>
+        <p><i>You need at least 10,000 tokens to activate Premium!</i></p>
+        
+        <button class="phantom-btn" onclick="connectPhantom()">
+            <img src="https://phantom.app/img/logo.png" alt="Phantom" onerror="this.style.display='none'">
+            Connect Phantom
+        </button>
+
+        <p id="status"></p>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        async function connectPhantom() {
+            const statusText = document.getElementById('status');
+            
+            // Check of Phantom is geïnstalleerd (of via Phantom in-app browser wordt geopend)
+            const getProvider = () => {
+                if ('phantom' in window) {
+                    const provider = window.phantom?.solana;
+                    if (provider?.isPhantom) return provider;
+                }
+                window.open('https://phantom.app/', '_blank');
+                return null;
+            };
+
+            const provider = getProvider();
+            
+            if (provider) {
+                try {
+                    statusText.innerText = "Requesting connection...";
+                    const resp = await provider.connect();
+                    const walletAddress = resp.publicKey.toString();
+                    
+                    statusText.style.color = "#0f0";
+                    statusText.innerText = "Wallet connected! Verifying in Telegram...";
+                    
+                    // Stuur het adres naar de bot
+                    let payload = { action: 'link_wallet', wallet: walletAddress };
+                    tg.sendData(JSON.stringify(payload));
+                    
+                } catch (err) {
+                    statusText.style.color = "#f00";
+                    statusText.innerText = "Connection rejected or failed.";
+                }
+            } else {
+                statusText.style.color = "#f00";
+                statusText.innerText = "Phantom wallet not found. Please open this in the Phantom App Browser or install the extension.";
+            }
+        }
+    </script>
+</body>
+</html>

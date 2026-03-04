@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Connect Phantom</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
@@ -29,47 +32,64 @@
     </div>
 
     <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
+        // VEILIGE TELEGRAM INIT: Voorkomt crashes in de Phantom App!
+        let tg = null;
+        try {
+            if (window.Telegram && window.Telegram.WebApp) {
+                tg = window.Telegram.WebApp;
+                tg.expand();
+            }
+        } catch (e) {
+            console.log("Not running inside Telegram");
+        }
 
         const MY_WEBAPP_URL = "https://noone3592.github.io/telegram-bot-app/wallet.html"; 
         const BOT_USERNAME = "Omni_V1_Bot";
+        const statusText = document.getElementById('status');
+
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('auto') === 'true') {
+                statusText.innerText = "Preparing Phantom connection...";
+                // We wachten 1 seconde zodat Phantom zijn in-app provider kan inladen!
+                setTimeout(connectPhantom, 1000);
+            }
+        };
 
         async function connectPhantom() {
-            const statusText = document.getElementById('status');
-            const provider = window.phantom?.solana;
-            
-            if (provider?.isPhantom) {
-                try {
-                    statusText.innerText = "Requesting connection...";
+            try {
+                const provider = window.phantom?.solana;
+                
+                if (provider && provider.isPhantom) {
+                    statusText.innerText = "Phantom found! Requesting access...";
                     const resp = await provider.connect();
                     const walletAddress = resp.publicKey.toString();
                     
                     statusText.style.color = "#0f0";
-                    statusText.innerText = "Connected! Returning to Telegram...";
+                    statusText.innerText = "Success! Redirecting to bot...";
                     
-                    // Als we initData hebben, zitten we in de PC Telegram
-                    if (tg.initDataUnsafe && Object.keys(tg.initDataUnsafe).length > 0) {
+                    if (tg && tg.initDataUnsafe && Object.keys(tg.initDataUnsafe).length > 0) {
                         tg.sendData(JSON.stringify({ action: 'link_wallet', wallet: walletAddress }));
                     } else {
-                        // Anders zitten we in de Phantom App browser! Stuur ons terug naar de bot.
                         window.location.href = `https://t.me/${BOT_USERNAME}?start=wallet_${walletAddress}`;
                     }
-                } catch (err) {
-                    statusText.style.color = "#f00";
-                    statusText.innerText = "Connection rejected.";
+                } else {
+                    statusText.innerText = "Redirecting to Phantom App...";
+                    
+                    const myUrlWithParam = MY_WEBAPP_URL + "?auto=true";
+                    const encodedUrl = encodeURIComponent(myUrlWithParam);
+                    const deepLink = `https://phantom.app/ul/browse/${encodedUrl}?ref=${encodedUrl}`;
+                    
+                    if (tg && tg.openLink) {
+                        tg.openLink(deepLink); 
+                    } else {
+                        window.location.href = deepLink; 
+                    }
                 }
-            } else {
-                // HIER ZIT DE MAGIE: Gebruik tg.openLink om Telegram te forceren de Phantom App te openen
-                statusText.innerText = "Opening Phantom App...";
-                const encodedUrl = encodeURIComponent(MY_WEBAPP_URL);
-                const deepLink = `https://phantom.app/ul/browse/${encodedUrl}?ref=${encodedUrl}`;
-                
-                try {
-                    tg.openLink(deepLink); // Officiële Telegram WebApp routing
-                } catch (e) {
-                    window.location.href = deepLink; // Fallback
-                }
+            } catch (err) {
+                // Als het nu misgaat, zien we de rode error tekst direct op het scherm!
+                statusText.style.color = "#f00";
+                statusText.innerText = "Error: " + (err.message || "Connection rejected.");
             }
         }
     </script>

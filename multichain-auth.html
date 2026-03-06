@@ -6,19 +6,26 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <title>Omni Bot - Multichain Auth</title>
 
-    <script src="https://unpkg.com/@walletconnect/ethereum-provider@2.11.1/dist/index.umd.js"></script>
-    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
+    <script>
+        // We 'faken' de Node.js omgeving voor de browser
+        window.Buffer = window.buffer ? window.buffer.Buffer : window.Buffer;
+        window.process = { env: { NODE_ENV: "production" } };
+        window.global = window;
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider@2.14.0/dist/index.umd.min.js" 
+            onerror="document.getElementById('error-log').style.display='block'; document.getElementById('error-log').innerHTML+='❌ Fatal Error: Could not download WalletConnect script. Please disable adblockers.<br>';"></script>
+
     <style>
         body { background: #121212; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding-top: 50px; margin: 0; }
         .container { max-width: 90%; margin: 0 auto; background: #1e1e1e; padding: 30px 20px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
         h2 { color: #ab9ff2; margin-top: 0; }
         .btn { background: #ab9ff2; color: #000; font-size: 18px; font-weight: bold; border: none; padding: 16px; border-radius: 12px; width: 100%; cursor: pointer; margin-top: 15px; display: none; }
-        .btn-alt { background: #ffaa00; color: #000; } /* Speciale kleur voor In-App/MetaMask wallets */
+        .btn-alt { background: #ffaa00; color: #000; } 
         .btn:active { transform: scale(0.96); }
         p { color: #ccc; font-size: 15px; line-height: 1.5; }
         #status { margin-top: 20px; font-size: 14px; font-weight: bold; color: #aaa; }
-        
-        /* Foutmeldingen worden nu leesbaar geprint in plaats van een wit scherm */
         #error-log { margin-top: 20px; font-family: monospace; font-size: 12px; color: #ff5555; text-align: left; background: #2a0000; padding: 10px; border-radius: 8px; display: none; overflow-wrap: break-word;}
     </style>
 
@@ -54,11 +61,10 @@
         const browserBtn = document.getElementById('browser-btn');
         const errorLog = document.getElementById('error-log');
 
-        // Vangt alle errors op die de browser normaal verbergt
         function showError(msg) {
             errorLog.style.display = 'block';
             errorLog.innerHTML += `❌ ${msg}<br>`;
-            statusTxt.innerText = "Error occurred.";
+            statusTxt.innerText = "Connection failed.";
         }
         
         window.onerror = function(msg, url, line) {
@@ -77,18 +83,17 @@
 
             instructionTxt.innerHTML = "Select a method below to securely link your multichain wallet.";
 
-            // 1. Zien we toevallig een actieve Wallet App (MetaMask / Trust)?
+            // Controleert of MetaMask of Trust Wallet lokaal geïnstalleerd is
             if (window.ethereum) {
                 browserBtn.style.display = 'block';
                 browserBtn.onclick = connectBrowserWallet;
             }
 
-            // 2. Toon ALTIJD de WalletConnect knop voor externe connecties
+            // WalletConnect knop
             wcBtn.style.display = 'block';
             wcBtn.onclick = connectWalletConnect;
         };
 
-        // Succesfunctie
         async function proceedWithAddress(address) {
             statusTxt.style.color = "#00ff00";
             statusTxt.innerText = `✅ Success! Redirecting...`;
@@ -100,7 +105,6 @@
             }, 1500);
         }
 
-        // OPTIE 1: Direct in-app (Kan onmogelijk netwerk/CDN fouten geven!)
         async function connectBrowserWallet() {
             try {
                 statusTxt.innerText = "Requesting browser wallet...";
@@ -111,32 +115,30 @@
                     throw new Error("No accounts found.");
                 }
             } catch (err) {
-                showError("Browser Wallet: " + err.message);
+                showError("Browser Wallet Error: " + err.message);
             }
         }
 
-        // OPTIE 2: Officiële WalletConnect UMD integratie
         async function connectWalletConnect() {
             try {
                 statusTxt.innerText = "Initializing WalletConnect...";
                 
-                // Haal de script-klasse op (deze is via de <head> ingeladen)
-                const ProviderClass = window.EthereumProvider || (window.WalletConnectEthereumProvider && window.WalletConnectEthereumProvider.EthereumProvider);
+                // We checken nu op het juiste global object, en geven een specifieke error als hij faalt
+                const ProviderClass = window.WalletConnectEthereumProvider ? window.WalletConnectEthereumProvider.EthereumProvider : window.EthereumProvider;
                 
                 if (!ProviderClass) {
-                    throw new Error("WalletConnect script blocked by your browser. Please disable adblockers or refresh the page.");
+                    throw new Error("Initialization failed. The Polyfills or Script did not load correctly.");
                 }
 
                 const provider = await ProviderClass.init({
                     projectId: projectId,
-                    chains: [1], // Ethereum Mainnet (is verplicht voor WalletConnect om op te starten)
-                    showQrModal: true, // Zorgt automatisch voor de UI pop-up
+                    chains: [1], 
+                    showQrModal: true,
                     qrModalOptions: { themeMode: "dark" }
                 });
 
                 statusTxt.innerText = "Opening WalletConnect Popup...";
                 
-                // Start de pop-up
                 await provider.enable();
                 
                 if (provider.accounts && provider.accounts.length > 0) {

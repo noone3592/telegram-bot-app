@@ -14,7 +14,7 @@
     </script>
 
     <script src="https://unpkg.com/@walletconnect/ethereum-provider@2.14.0/dist/index.umd.js" 
-            onerror="document.getElementById('error-log').style.display='block'; document.getElementById('error-log').innerHTML+='❌ Fatal Error: Script blocked by browser or adblocker.<br>';"></script>
+            onerror="document.getElementById('error-log').style.display='block'; document.getElementById('error-log').innerHTML+='❌ Fatal Error: Script blocked.<br>';"></script>
 
     <style>
         body { background: #121212; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding-top: 50px; margin: 0; }
@@ -71,6 +71,15 @@
             return true;
         };
 
+        // Simpele functie om tekst naar Hex code te zetten voor de handtekening
+        function stringToHex(str) {
+            let hex = '';
+            for(let i=0; i<str.length; i++) {
+                hex += '' + str.charCodeAt(i).toString(16);
+            }
+            return '0x' + hex;
+        }
+
         window.onload = () => {
             const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
             if (isTelegramWebView && isIOS) {
@@ -89,9 +98,10 @@
             wcBtn.onclick = connectWalletConnect;
         };
 
+        // De functie die de handtekening verwerkt en je terugstuurt
         async function proceedWithAddress(address) {
             statusTxt.style.color = "#00ff00";
-            statusTxt.innerText = `✅ Success! Redirecting...`;
+            statusTxt.innerText = `✅ Verified! Redirecting...`;
             wcBtn.style.display = 'none';
             browserBtn.style.display = 'none';
 
@@ -102,10 +112,22 @@
 
         async function connectBrowserWallet() {
             try {
-                statusTxt.innerText = "Requesting browser wallet...";
+                statusTxt.innerText = "Requesting connection...";
                 const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                if (accounts && accounts.length > 0) proceedWithAddress(accounts[0]);
-                else throw new Error("No accounts found.");
+                if (!accounts || accounts.length === 0) throw new Error("No accounts found.");
+                
+                const address = accounts[0];
+                
+                // FORCEER DE HANDTEKENING POP-UP!
+                statusTxt.innerText = "Please SIGN the message in your wallet...";
+                const messageHex = stringToHex("Verify wallet for Omni Bot Governance");
+                
+                await window.ethereum.request({
+                    method: 'personal_sign',
+                    params: [messageHex, address],
+                });
+
+                proceedWithAddress(address);
             } catch (err) {
                 showError("Browser Wallet: " + err.message);
             }
@@ -113,28 +135,21 @@
 
         async function connectWalletConnect() {
             try {
-                statusTxt.innerText = "Scanning for WalletConnect...";
+                statusTxt.innerText = "Loading WalletConnect...";
                 
-                // DE BRUTE-FORCE RADAR: Zoek het hele systeem af naar de EthereumProvider
                 let ProviderClass = null;
                 for (const key in window) {
                     try {
-                        // Is het direct de provider?
                         if (window[key] && typeof window[key].init === 'function' && key.toLowerCase().includes('ethereumprovider')) {
                             ProviderClass = window[key]; break;
                         }
-                        // Zit het verstopt in een sub-object?
                         if (window[key] && window[key].EthereumProvider && typeof window[key].EthereumProvider.init === 'function') {
                             ProviderClass = window[key].EthereumProvider; break;
                         }
                     } catch(e) {}
                 }
 
-                if (!ProviderClass) {
-                    throw new Error("Could not find Provider in memory. Ensure domains are whitelisted and reload.");
-                }
-
-                statusTxt.innerText = "Initializing WalletConnect...";
+                if (!ProviderClass) throw new Error("Provider not found.");
 
                 const provider = await ProviderClass.init({
                     projectId: projectId,
@@ -143,14 +158,30 @@
                     qrModalOptions: { themeMode: "dark" }
                 });
 
+                // TRUC 1: Verwijder oude spook-sessies zodat hij niet stilletjes skipt
+                if (provider.session) {
+                    try { await provider.disconnect(); } catch(e) {}
+                }
+
                 statusTxt.innerText = "Opening WalletConnect Popup...";
                 await provider.enable();
                 
-                if (provider.accounts && provider.accounts.length > 0) {
-                    proceedWithAddress(provider.accounts[0]);
-                } else {
-                    throw new Error("No accounts returned from WalletConnect.");
+                if (!provider.accounts || provider.accounts.length === 0) {
+                    throw new Error("No accounts returned.");
                 }
+
+                const address = provider.accounts[0];
+
+                // TRUC 2: FORCEER DE HANDTEKENING (Dit wekt de wallet-app 100% zeker op!)
+                statusTxt.innerText = "Please SIGN the message in your wallet app...";
+                const messageHex = stringToHex("Verify wallet for Omni Bot Governance");
+
+                await provider.request({
+                    method: "personal_sign",
+                    params: [messageHex, address]
+                });
+
+                proceedWithAddress(address);
 
             } catch (err) {
                 showError("WalletConnect: " + err.message);

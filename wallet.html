@@ -4,52 +4,39 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <title>Omni Bot - Connect</title>
+    <title>Omni Bot - Premium Connect</title>
     <style>
         body { background: #121212; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding-top: 60px; margin: 0; }
         .container { max-width: 90%; margin: 0 auto; background: #1e1e1e; padding: 30px 20px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
         h2 { color: #ab9ff2; margin-top: 0; }
         .btn { background: #ab9ff2; color: #000; font-size: 18px; font-weight: bold; border: none; padding: 16px; border-radius: 12px; width: 100%; cursor: pointer; margin-top: 15px; }
         .btn:active { background: #9580ff; }
-        .compass-icon { font-size: 50px; margin: 20px 0; }
         #status { margin-top: 20px; font-size: 14px; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container" id="content">
-        <h2>Loading...</h2>
+        <h2>Premium Verification</h2>
+        <p>Checking environment...</p>
     </div>
 
     <script>
-        const DOMAIN_PATH = "noone3592.github.io/telegram-bot-app/wallet.html?v=7";
-        const FULL_URL = "https://" + DOMAIN_PATH;
         const BOT_URL = "https://t.me/Omni_V1_Bot";
+        
+        // JOUW OPLOSSING: Check voor Telegram in-app browser op Android
+        const isAndroid = /android/i.test(navigator.userAgent);
+        const isTelegramWebView = (window.TelegramWebview || navigator.userAgent.includes("Telegram"));
 
-        // 1. ZIJN WE IN DE IN-APP BROWSER VAN TELEGRAM?
-        const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-        const isTelegram = (userAgent.indexOf("Telegram") > -1);
-        const isAndroid = (/android/i.test(userAgent));
-        const isIOS = (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream);
-
-        if (isTelegram) {
-            if (isAndroid) {
-                // DE MAGISCHE RECAP BOT TRUC VOOR ANDROID: 
-                // Dit forceert de telefoon om DIRECT de in-app browser te verlaten en Chrome te openen!
-                window.location.replace("intent://" + DOMAIN_PATH + "#Intent;scheme=https;package=com.android.chrome;end;");
-            } else if (isIOS) {
-                // Op iOS (Apple) moeten we de gebruiker instrueren het Safari icoontje te klikken
-                document.getElementById("content").innerHTML = `
-                    <h2>⚠️ Open in Safari</h2>
-                    <p>Telegram blocks secure wallet connections.</p>
-                    <div class="compass-icon">🧭</div>
-                    <p>Please tap the <b>Compass icon</b> in the bottom right corner to open this page in Safari.</p>
-                `;
-            }
+        if (isAndroid && isTelegramWebView) {
+            // Pas de magische intent URL toe die jij hebt gevonden!
+            const url = window.location.href;
+            const chromeUrl = `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;end`;
+            window.location.href = chromeUrl;
         } else {
-            // 2. WE ZITTEN VEILIG IN CHROME / SAFARI! Laad de connectie interface in.
+            // Als we NIET in de in-app browser zitten (dus in Chrome/Safari), toon dan de Connect knop
             document.getElementById("content").innerHTML = `
                 <h2>Premium Verification</h2>
-                <p>Click the button below to connect your Phantom wallet.</p>
+                <p>Click the button below to safely connect your Phantom wallet.</p>
                 <button class="btn" onclick="connectWallet()">🔗 Connect Phantom</button>
                 <p id="status"></p>
             `;
@@ -63,25 +50,23 @@
             
             if (provider && provider.isPhantom) {
                 try {
-                    // Forceer de Phantom pop-up
+                    // Forceer de connectie pop-up
                     const resp = await provider.connect();
                     const wallet = resp.publicKey.toString();
                     
                     status.style.color = "#00ff00";
                     status.innerText = "✅ Success! Redirecting to Telegram...";
                     
-                    // Schiet de gebruiker terug naar de bot
                     setTimeout(() => {
                         window.location.href = BOT_URL + "?start=wallet_" + wallet;
                     }, 1500);
                 } catch (err) {
                     status.style.color = "#ff0000";
-                    status.innerText = "❌ Cancelled or error: " + err.message;
+                    status.innerText = "❌ Error: " + err.message;
                 }
             } else {
-                // Als iemand in Chrome zit maar Phantom niet heeft geïnstalleerd
-                status.innerText = "Opening Phantom App...";
-                const encodedUrl = encodeURIComponent(FULL_URL);
+                status.innerText = "Opening Phantom app...";
+                const encodedUrl = encodeURIComponent(window.location.href);
                 window.location.href = "https://phantom.app/ul/browse/" + encodedUrl + "?ref=" + encodedUrl;
             }
         }

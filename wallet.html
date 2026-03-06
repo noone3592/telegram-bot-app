@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Omni Bot - Connect</title>
+    <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
     <style>
         body { background: #121212; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding-top: 50px; margin: 0; }
         .container { max-width: 90%; margin: 0 auto; background: #1e1e1e; padding: 30px 20px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
@@ -11,78 +12,139 @@
         .btn { background: #ab9ff2; color: #000; font-size: 18px; font-weight: bold; border: none; padding: 16px; border-radius: 12px; width: 100%; cursor: pointer; margin-top: 15px; }
         .btn:active { background: #9580ff; }
         p { color: #ccc; font-size: 15px; line-height: 1.5; }
-        #status { margin-top: 20px; font-size: 14px; font-weight: bold; }
+        #status { margin-top: 20px; font-size: 14px; font-weight: bold; color: #aaa; }
     </style>
 </head>
 <body>
     <div class="container" id="content">
         <h2>Premium Verification</h2>
-        <p>Click the button below to securely connect your Phantom wallet.</p>
-        <button class="btn" onclick="startConnection()">🔮 Connect Phantom</button>
+        <p>Loading secure environment...</p>
         <p id="status"></p>
     </div>
 
     <script>
-        // Jouw GitHub Pages URL en je Bot URL
         const MY_URL = "https://noone3592.github.io/telegram-bot-app/wallet.html";
         const BOT_URL = "https://t.me/Omni_V1_Bot";
-        
-        // De Recap-truc: We gebruiken de URL parameters om te checken of we uit Phantom komen
+
+        // --- Base58 Codering (Verplicht door Solana/Phantom) ---
+        const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+        function encodeBase58(buffer) {
+            let carry, digits = [0], i, j;
+            for (i = 0; i < buffer.length; ++i) {
+                for (j = 0, carry = buffer[i]; j < digits.length; ++j) {
+                    carry += digits[j] << 8;
+                    digits[j] = carry % 58; carry = (carry / 58) | 0;
+                }
+                while (carry > 0) { digits.push(carry % 58); carry = (carry / 58) | 0; }
+            }
+            let res = '';
+            for (i = 0; buffer[i] === 0 && i < buffer.length - 1; ++i) res += ALPHABET[0];
+            for (i = digits.length - 1; i >= 0; --i) res += ALPHABET[digits[i]];
+            return res;
+        }
+        function decodeBase58(string) {
+            let carry, bytes = [0], i, j;
+            for (i = 0; i < string.length; ++i) {
+                const char = string[i]; const val = ALPHABET.indexOf(char);
+                if (val < 0) throw new Error('Non-base58 character');
+                for (j = 0, carry = val; j < bytes.length; ++j) {
+                    carry += bytes[j] * 58; bytes[j] = carry & 0xff; carry >>= 8;
+                }
+                while (carry > 0) { bytes.push(carry & 0xff); carry >>= 8; }
+            }
+            for (i = 0; string[i] === '1' && i < string.length - 1; ++i) bytes.push(0);
+            return new Uint8Array(bytes.reverse());
+        }
+        // ---------------------------------------------------------
+
         const urlParams = new URLSearchParams(window.location.search);
-        const autoConnect = urlParams.get('autoConnect');
+        const contentDiv = document.getElementById('content');
+        const statusTxt = document.getElementById('status');
 
         window.onload = () => {
-            // Als we in de Phantom app zitten (na de overstap), triggeren we direct de connectie!
-            if (autoConnect === 'true' && window.phantom && window.phantom.solana) {
-                document.getElementById('content').innerHTML = `
-                    <h2>Phantom Linked</h2>
-                    <p>Approve the connection request in Phantom.</p>
-                    <p id="status" style="color:#ffaa00;">Waiting for approval...</p>
+            // SCENARIO 1: Gebruiker heeft geweigerd in Phantom
+            if (urlParams.has('errorCode')) {
+                contentDiv.innerHTML = `
+                    <h2>❌ Canceled</h2>
+                    <p>You refused the connection or an error has occured.</p>
+                    <button class="btn" onclick="window.location.href=MY_URL">Opnieuw Proberen</button>
                 `;
-                finalizeConnection();
+                return;
             }
+
+            // SCENARIO 2: We komen TERUG uit Phantom met versleutelde data!
+            if (urlParams.has('phantom_encryption_public_key')) {
+                statusTxt.innerText = "Decrypting wallet data...";
+                try {
+                    // Haal onze opgeslagen sleutel op
+                    const sharedSecretStr = localStorage.getItem('dapp_secret_key');
+                    if (!sharedSecretStr) throw new Error("No safety key found.");
+                    
+                    const secretKey = new Uint8Array(JSON.parse(sharedSecretStr));
+                    const phantomPublicKey = decodeBase58(urlParams.get('phantom_encryption_public_key'));
+                    const nonce = decodeBase58(urlParams.get('nonce'));
+                    const data = decodeBase58(urlParams.get('data'));
+
+                    // Ontsleutel het bericht van Phantom
+                    const decrypted = nacl.box.open(data, nonce, phantomPublicKey, secretKey);
+                    if (!decrypted) throw new Error("Decrypting failed!");
+
+                    // Lees het Solana Wallet Adres uit
+                    const decText = new TextDecoder().decode(decrypted);
+                    const parsedData = JSON.parse(decText);
+                    const walletAddress = parsedData.public_key;
+
+                    contentDiv.innerHTML = `
+                        <h2>✅ Wallet Linked</h2>
+                        <p>Connection Succesfull!</p>
+                        <p style="color:#0f0;">You will be sent back to Telegram...</p>
+                    `;
+
+                    // Schoon op en stuur de gebruiker terug naar de Telegram Bot
+                    localStorage.removeItem('dapp_secret_key');
+                    setTimeout(() => {
+                        window.location.href = BOT_URL + "?start=wallet_" + walletAddress;
+                    }, 1000);
+
+                } catch (err) {
+                    contentDiv.innerHTML = `
+                        <h2>❌ Error with verification</h2>
+                        <p>${err.message}</p>
+                        <button class="btn" onclick="window.location.href=MY_URL">Opnieuw Proberen</button>
+                    `;
+                }
+                return;
+            }
+
+            // SCENARIO 3: Normale startpagina in Telegram (Maak de knop)
+            contentDiv.innerHTML = `
+                <h2>Premium Verification</h2>
+                <p>Press below to connect to your Phantom wallet</p>
+                <button class="btn" onclick="startNativePhantom()">🔮 Connect Phantom</button>
+            `;
         };
 
-        function startConnection() {
-            const status = document.getElementById('status');
-            const provider = window.phantom ? window.phantom.solana : null;
+        function startNativePhantom() {
+            statusTxt.innerText = "Building safe connection...";
             
-            // 1. Zitten we toevallig al in Phantom of op PC? Dan direct verbinden.
-            if (provider && provider.isPhantom) {
-                finalizeConnection();
-            } 
-            // 2. We zitten in de Telegram In-App Browser! 
-            else {
-                status.innerText = "Opening Phantom App...";
-                
-                // We sturen de gebruiker naar Phantom via de officiële Deep Link.
-                // We plakken '?autoConnect=true' achter de URL, zodat het script straks weet dat hij in Phantom de pop-up moet tonen!
-                const targetUrl = MY_URL + "?autoConnect=true";
-                const encodedUrl = encodeURIComponent(targetUrl);
-                
-                // Dit is de exacte link die Recap aanroept om de Phantom app te openen
-                window.location.href = "https://phantom.app/ul/browse/" + encodedUrl + "?ref=" + encodedUrl;
-            }
-        }
+            // 1. Genereer een uniek slot + sleutel (Encryptie)
+            const keypair = nacl.box.keyPair();
+            
+            // 2. Bewaar de sleutel lokaal zodat we het antwoord van Phantom straks kunnen lezen
+            localStorage.setItem('dapp_secret_key', JSON.stringify(Array.from(keypair.secretKey)));
 
-        async function finalizeConnection() {
-            const status = document.getElementById('status');
-            try {
-                // Forceer de "Connect" pop-up in Phantom
-                const resp = await window.phantom.solana.connect();
-                const wallet = resp.publicKey.toString();
-                
-                status.style.color = "#00ff00";
-                status.innerText = "✅ Success! Redirecting back to Telegram...";
-                
-                // Schiet de gebruiker (met z'n wallet adres) terug naar de Telegram Bot
-                setTimeout(() => {
-                    window.location.href = BOT_URL + "?start=wallet_" + wallet;
-                }, 1500);
-            } catch (err) {
-                status.style.color = "#ff0000";
-                status.innerText = "❌ Cancelled or error: " + err.message;
-            }
+            // 3. Bouw de NATIVE Phantom Deep Link
+            const appUrl = encodeURIComponent("https://noone3592.github.io");
+            const redirectLink = encodeURIComponent(MY_URL);
+            const publicKeyB58 = encodeBase58(keypair.publicKey);
+
+            // Dit is het commando waarmee we Phantom FORCEREN om direct de pop-up te tonen!
+            const deepLink = `https://phantom.app/ul/v1/connect?app_url=${appUrl}&dapp_encryption_public_key=${publicKeyB58}&redirect_link=${redirectLink}`;
+            
+            statusTxt.innerText = "Open Phantom app...";
+            
+            // Gooi de link naar je besturingssysteem
+            window.location.href = deepLink;
         }
     </script>
 </body>

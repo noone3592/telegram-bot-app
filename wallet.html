@@ -3,16 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connect Phantom</title>
+    <title>Omni Bot - Connect</title>
+    
+    <script>
+        if (window.TelegramWebview || navigator.userAgent.includes("Telegram")) {
+            const url = window.location.href;
+            const chromeUrl = `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;end`;
+            window.location.href = chromeUrl;
+        }
+    </script>
+    
     <style>
         body { background: #121212; color: #fff; font-family: sans-serif; text-align: center; padding-top: 80px; margin: 0; }
-        .btn { background: #ab9ff2; color: #000; font-size: 18px; font-weight: bold; border: none; padding: 15px; border-radius: 12px; width: 80%; cursor: pointer; margin-top: 20px; }
+        h2 { color: #ab9ff2; }
+        .btn { background: #ab9ff2; color: #000; font-size: 18px; font-weight: bold; border: none; padding: 15px; border-radius: 12px; width: 80%; max-width: 300px; cursor: pointer; margin-top: 20px; }
+        .btn:active { background: #9580ff; }
         #status { margin-top: 20px; font-size: 14px; font-weight: bold; }
     </style>
 </head>
 <body>
-    <h2>Stap 2: Premium Verification</h2>
-    <p>Je zit nu veilig in je browser.</p>
+    <h2>Premium Verification</h2>
+    <p>Click below to safely connect your Phantom wallet.</p>
     
     <button class="btn" onclick="connectWallet()">🔗 Connect Phantom</button>
     <p id="status"></p>
@@ -22,27 +33,29 @@
 
         async function connectWallet() {
             const status = document.getElementById('status');
-            status.innerText = "Waiting for validation...";
+            status.innerText = "Requesting approval...";
             
             const provider = window.phantom ? window.phantom.solana : null;
             
+            // Als we succesvol in Chrome zitten en de Phantom provider is gevonden
             if (provider && provider.isPhantom) {
                 try {
                     const resp = await provider.connect();
                     const wallet = resp.publicKey.toString();
                     
-                    status.style.color = "#00ff00";
-                    status.innerText = "✅ Success! Back to telegram...";
+                    status.style.color = "#0f0";
+                    status.innerText = "✅ Success! Redirecting...";
                     
                     setTimeout(() => {
                         window.location.href = BOT_URL + "?start=wallet_" + wallet;
                     }, 1500);
                 } catch (err) {
-                    status.style.color = "#ff0000";
+                    status.style.color = "#f00";
                     status.innerText = "❌ Error: " + err.message;
                 }
             } else {
-                status.innerText = "Open Phantom app...";
+                // Als Chrome open is maar Phantom is nog niet geactiveerd:
+                status.innerText = "Opening Phantom app...";
                 const encodedUrl = encodeURIComponent(window.location.href);
                 window.location.href = "https://phantom.app/ul/browse/" + encodedUrl + "?ref=" + encodedUrl;
             }

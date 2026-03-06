@@ -17,8 +17,8 @@
 </head>
 <body>
     <div class="container">
-        <h2>Premium Verificatie</h2>
-        <p id="instruction">We checken je browser...</p>
+        <h2>Premium Verification</h2>
+        <p id="instruction">Checking your browser...</p>
         
         <button id="mainBtn" class="btn" style="display:none;"></button>
         
@@ -33,21 +33,21 @@
         const instruction = document.getElementById("instruction");
         const log = document.getElementById("log");
 
-        // Check of de in-app Solana provider van Phantom aanwezig is
+        // Check if the Phantom in-app Solana provider is present
         function isPhantom() {
             return window.phantom && window.phantom.solana && window.phantom.solana.isPhantom;
         }
 
         window.onload = () => {
             if (isPhantom()) {
-                // SCENARIO 1: Gebruiker zit IN de Phantom App
-                instruction.innerHTML = "✅ Phantom app succesvol geladen!<br><br>Klik op de knop hieronder om de goedkeuring ('Connect') aan te roepen.";
-                btn.innerText = "✍️ Geef Goedkeuring";
+                // SCENARIO 1: User is inside the Phantom App
+                instruction.innerHTML = "✅ Phantom app successfully loaded!<br><br>Click the button below to sign the connection request.";
+                btn.innerText = "✍️ Approve Connection";
                 btn.style.display = "block";
                 btn.onclick = doConnectAndSign;
             } else {
-                // SCENARIO 2: Gebruiker zit in Telegram of Safari/Chrome
-                instruction.innerHTML = "Om je wallet veilig te koppelen, moeten we deze pagina openen in de Phantom App.<br><br>Klik hieronder om Phantom te starten.";
+                // SCENARIO 2: User is in Telegram or Chrome/Safari
+                instruction.innerHTML = "To securely link your wallet, we need to open this page inside the Phantom App.<br><br>Click below to launch Phantom.";
                 btn.innerText = "🚀 Open Phantom App";
                 btn.style.display = "block";
                 btn.onclick = openPhantomDeepLink;
@@ -56,7 +56,7 @@
 
         function openPhantomDeepLink() {
             log.style.color = "#ffaa00";
-            log.innerText = "Doorsturen naar Phantom...";
+            log.innerText = "Redirecting to Phantom...";
             const encodedUrl = encodeURIComponent(MY_URL);
             window.location.href = `https://phantom.app/ul/browse/${encodedUrl}?ref=${encodedUrl}`;
         }
@@ -64,25 +64,25 @@
         async function doConnectAndSign() {
             try {
                 log.style.color = "#ffaa00";
-                log.innerText = "Wachten op jouw goedkeuring...";
+                log.innerText = "Waiting for your approval...";
                 
                 const provider = window.phantom.solana;
 
-                // Dit is het commando dat de "Connect" popup in Phantom forceert
+                // This forces the "Connect" popup in Phantom
                 const resp = await provider.connect();
                 const wallet = resp.publicKey.toString();
 
                 log.style.color = "#00ff00";
-                log.innerText = "✅ Verbonden! Je wordt nu teruggestuurd naar Telegram...";
+                log.innerText = "✅ Success! Redirecting back to Telegram...";
 
-                // Wacht 1,5 seconde zodat de gebruiker ziet dat het gelukt is, schiet dan terug naar de bot
+                // Wait 1.5 seconds so the user sees the success message, then redirect
                 setTimeout(() => {
                     window.location.href = `${BOT_URL}?start=wallet_${wallet}`;
                 }, 1500);
 
             } catch (err) {
                 log.style.color = "#ff0000";
-                log.innerText = "❌ Geannuleerd of fout: " + err.message;
+                log.innerText = "❌ Cancelled or error: " + err.message;
             }
         }
     </script>

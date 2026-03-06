@@ -26,7 +26,7 @@
         const MY_URL = "https://noone3592.github.io/telegram-bot-app/wallet.html";
         const BOT_URL = "https://t.me/Omni_V1_Bot";
 
-        // --- Base58 Codering (Verplicht door Solana/Phantom) ---
+        // --- Base58 Encoding (Required by Solana) ---
         const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
         function encodeBase58(buffer) {
             let carry, digits = [0], i, j;
@@ -62,88 +62,87 @@
         const statusTxt = document.getElementById('status');
 
         window.onload = () => {
-            // SCENARIO 1: Gebruiker heeft geweigerd in Phantom
+            // SCENARIO 1: User cancelled the request
             if (urlParams.has('errorCode')) {
                 contentDiv.innerHTML = `
-                    <h2>❌ Canceled</h2>
-                    <p>You refused the connection or an error has occured.</p>
-                    <button class="btn" onclick="window.location.href=MY_URL">Opnieuw Proberen</button>
+                    <h2>❌ Connection Cancelled</h2>
+                    <p>You declined the request in Phantom or an error occurred.</p>
+                    <button class="btn" onclick="window.location.href=MY_URL">Try Again</button>
                 `;
                 return;
             }
 
-            // SCENARIO 2: We komen TERUG uit Phantom met versleutelde data!
+            // SCENARIO 2: Returning from Phantom with encrypted data
             if (urlParams.has('phantom_encryption_public_key')) {
                 statusTxt.innerText = "Decrypting wallet data...";
                 try {
-                    // Haal onze opgeslagen sleutel op
-                    const sharedSecretStr = localStorage.getItem('dapp_secret_key');
-                    if (!sharedSecretStr) throw new Error("No safety key found.");
+                    // We extract our secret key directly from the URL now! No localStorage needed.
+                    const skString = urlParams.get('sk');
+                    if (!skString) throw new Error("No safety key found in URL.");
                     
-                    const secretKey = new Uint8Array(JSON.parse(sharedSecretStr));
+                    const secretKey = decodeBase58(skString);
                     const phantomPublicKey = decodeBase58(urlParams.get('phantom_encryption_public_key'));
                     const nonce = decodeBase58(urlParams.get('nonce'));
                     const data = decodeBase58(urlParams.get('data'));
 
-                    // Ontsleutel het bericht van Phantom
+                    // Decrypt the payload
                     const decrypted = nacl.box.open(data, nonce, phantomPublicKey, secretKey);
-                    if (!decrypted) throw new Error("Decrypting failed!");
+                    if (!decrypted) throw new Error("Decryption failed!");
 
-                    // Lees het Solana Wallet Adres uit
+                    // Read the wallet address
                     const decText = new TextDecoder().decode(decrypted);
                     const parsedData = JSON.parse(decText);
                     const walletAddress = parsedData.public_key;
 
                     contentDiv.innerHTML = `
                         <h2>✅ Wallet Linked</h2>
-                        <p>Connection Succesfull!</p>
-                        <p style="color:#0f0;">You will be sent back to Telegram...</p>
+                        <p>Connection successful!</p>
+                        <p style="color:#0f0;">Redirecting you back to Telegram...</p>
                     `;
 
-                    // Schoon op en stuur de gebruiker terug naar de Telegram Bot
-                    localStorage.removeItem('dapp_secret_key');
+                    // Send the user back to the Telegram Bot
                     setTimeout(() => {
                         window.location.href = BOT_URL + "?start=wallet_" + walletAddress;
                     }, 1000);
 
                 } catch (err) {
                     contentDiv.innerHTML = `
-                        <h2>❌ Error with verification</h2>
+                        <h2>❌ Verification Failed</h2>
                         <p>${err.message}</p>
-                        <button class="btn" onclick="window.location.href=MY_URL">Opnieuw Proberen</button>
+                        <button class="btn" onclick="window.location.href=MY_URL">Try Again</button>
                     `;
                 }
                 return;
             }
 
-            // SCENARIO 3: Normale startpagina in Telegram (Maak de knop)
+            // SCENARIO 3: Normal start page
             contentDiv.innerHTML = `
                 <h2>Premium Verification</h2>
-                <p>Press below to connect to your Phantom wallet</p>
+                <p>Click below to securely connect your Phantom wallet.</p>
                 <button class="btn" onclick="startNativePhantom()">🔮 Connect Phantom</button>
             `;
         };
 
         function startNativePhantom() {
-            statusTxt.innerText = "Building safe connection...";
+            statusTxt.innerText = "Building secure connection...";
             
-            // 1. Genereer een uniek slot + sleutel (Encryptie)
+            // 1. Generate keys
             const keypair = nacl.box.keyPair();
             
-            // 2. Bewaar de sleutel lokaal zodat we het antwoord van Phantom straks kunnen lezen
-            localStorage.setItem('dapp_secret_key', JSON.stringify(Array.from(keypair.secretKey)));
-
-            // 3. Bouw de NATIVE Phantom Deep Link
-            const appUrl = encodeURIComponent("https://noone3592.github.io");
-            const redirectLink = encodeURIComponent(MY_URL);
+            // 2. Encode the secret key so we can pass it in the URL
+            const secretKeyB58 = encodeBase58(keypair.secretKey);
             const publicKeyB58 = encodeBase58(keypair.publicKey);
 
-            // Dit is het commando waarmee we Phantom FORCEREN om direct de pop-up te tonen!
+            // 3. Build the NATIVE Phantom Deep Link
+            const appUrl = encodeURIComponent("https://noone3592.github.io");
+            
+            // MAGIC FIX: We append our secret key (?sk=...) to the redirect link!
+            const redirectLink = encodeURIComponent(MY_URL + "?sk=" + secretKeyB58);
+
             const deepLink = `https://phantom.app/ul/v1/connect?app_url=${appUrl}&dapp_encryption_public_key=${publicKeyB58}&redirect_link=${redirectLink}`;
             
-            statusTxt.innerText = "Open Phantom app...";
+            statusTxt.innerText = "Opening Phantom App...";
             
-            // Gooi de link naar je besturingssysteem
             window.location.href = deepLink;
         }
     </script>

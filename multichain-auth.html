@@ -6,16 +6,15 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <title>Omni Bot - Multichain Auth</title>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/index.min.js"></script>
     <script>
-        // We 'faken' de Node.js omgeving voor de browser
-        window.Buffer = window.buffer ? window.buffer.Buffer : window.Buffer;
-        window.process = { env: { NODE_ENV: "production" } };
         window.global = window;
+        window.process = { env: { NODE_ENV: "production" } };
+        try { window.Buffer = window.Buffer || window.buffer.Buffer; } catch(e) {}
     </script>
 
-    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider@2.14.0/dist/index.umd.min.js" 
-            onerror="document.getElementById('error-log').style.display='block'; document.getElementById('error-log').innerHTML+='❌ Fatal Error: Could not download WalletConnect script. Please disable adblockers.<br>';"></script>
+    <script src="https://unpkg.com/@walletconnect/ethereum-provider@2.14.0/dist/index.umd.js" 
+            onerror="document.getElementById('error-log').style.display='block'; document.getElementById('error-log').innerHTML+='❌ Fatal Error: Script blocked by browser or adblocker.<br>';"></script>
 
     <style>
         body { background: #121212; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding-top: 50px; margin: 0; }
@@ -42,7 +41,7 @@
 <body>
     <div class="container">
         <h2>Governance Auth</h2>
-        <p id="instruction">Checking environment...</p>
+        <p id="instruction">Loading tools...</p>
         
         <button id="browser-btn" class="btn btn-alt">🦊 Browser Wallet</button>
         <button id="wc-btn" class="btn">🌍 WalletConnect</button>
@@ -72,24 +71,20 @@
             return true;
         };
 
-        const isTelegram = (window.TelegramWebview || navigator.userAgent.includes("Telegram"));
-        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-
         window.onload = () => {
-            if (isTelegram && isIOS) {
+            const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+            if (isTelegramWebView && isIOS) {
                 instructionTxt.innerHTML = "⚠️ <b>Telegram blocks secure connections.</b><br><br>Please tap the compass icon (🧭) in the bottom right corner to open Safari.";
                 return;
             }
 
-            instructionTxt.innerHTML = "Select a method below to securely link your multichain wallet.";
+            instructionTxt.innerHTML = "Select a method below to safely connect your wallet.";
 
-            // Controleert of MetaMask of Trust Wallet lokaal geïnstalleerd is
             if (window.ethereum) {
                 browserBtn.style.display = 'block';
                 browserBtn.onclick = connectBrowserWallet;
             }
 
-            // WalletConnect knop
             wcBtn.style.display = 'block';
             wcBtn.onclick = connectWalletConnect;
         };
@@ -109,26 +104,37 @@
             try {
                 statusTxt.innerText = "Requesting browser wallet...";
                 const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                if (accounts && accounts.length > 0) {
-                    proceedWithAddress(accounts[0]);
-                } else {
-                    throw new Error("No accounts found.");
-                }
+                if (accounts && accounts.length > 0) proceedWithAddress(accounts[0]);
+                else throw new Error("No accounts found.");
             } catch (err) {
-                showError("Browser Wallet Error: " + err.message);
+                showError("Browser Wallet: " + err.message);
             }
         }
 
         async function connectWalletConnect() {
             try {
-                statusTxt.innerText = "Initializing WalletConnect...";
+                statusTxt.innerText = "Scanning for WalletConnect...";
                 
-                // We checken nu op het juiste global object, en geven een specifieke error als hij faalt
-                const ProviderClass = window.WalletConnectEthereumProvider ? window.WalletConnectEthereumProvider.EthereumProvider : window.EthereumProvider;
-                
-                if (!ProviderClass) {
-                    throw new Error("Initialization failed. The Polyfills or Script did not load correctly.");
+                // DE BRUTE-FORCE RADAR: Zoek het hele systeem af naar de EthereumProvider
+                let ProviderClass = null;
+                for (const key in window) {
+                    try {
+                        // Is het direct de provider?
+                        if (window[key] && typeof window[key].init === 'function' && key.toLowerCase().includes('ethereumprovider')) {
+                            ProviderClass = window[key]; break;
+                        }
+                        // Zit het verstopt in een sub-object?
+                        if (window[key] && window[key].EthereumProvider && typeof window[key].EthereumProvider.init === 'function') {
+                            ProviderClass = window[key].EthereumProvider; break;
+                        }
+                    } catch(e) {}
                 }
+
+                if (!ProviderClass) {
+                    throw new Error("Could not find Provider in memory. Ensure domains are whitelisted and reload.");
+                }
+
+                statusTxt.innerText = "Initializing WalletConnect...";
 
                 const provider = await ProviderClass.init({
                     projectId: projectId,
@@ -138,7 +144,6 @@
                 });
 
                 statusTxt.innerText = "Opening WalletConnect Popup...";
-                
                 await provider.enable();
                 
                 if (provider.accounts && provider.accounts.length > 0) {

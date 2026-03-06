@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Redirecting...</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body style="background-color: #121212; color: white; text-align: center; font-family: sans-serif; padding-top: 50px;">
+    <h2>Opening in Chrome / Safari...</h2>
+    <script>
+        // Start Telegram WebApp
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+
+        // DE MAGISCHE TRUC: Forceer Telegram om de echte website in een EXTERNE browser te openen!
+        const targetUrl = "https://noone3592.github.io/telegram-bot-app/wallet.html?v=6";
+        
+        try {
+            tg.openLink(targetUrl);
+        } catch (e) {
+            window.location.href = targetUrl; // Fallback
+        }
+
+        // Sluit deze onzichtbare "Mini App" weer in Telegram
+        setTimeout(() => {
+            tg.close();
+        }, 500);
+    </script>
+</body>
+</html>

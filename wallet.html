@@ -5,52 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <title>Connect Phantom</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: #121212; color: #fff; font-family: sans-serif; text-align: center; padding: 30px 20px; }
+        body { background: #121212; color: #fff; font-family: sans-serif; text-align: center; padding: 50px 20px; }
         h2 { color: #ab9ff2; }
         .btn { background: #ab9ff2; color: #000; font-size: 18px; font-weight: bold; border: none; padding: 15px; border-radius: 8px; width: 100%; margin-top: 20px; cursor: pointer; }
         .btn:active { background: #9580ff; }
-        #status { margin-top: 20px; color: #ffeb3b; font-size: 16px; font-weight: bold; word-wrap: break-word; }
-        #debug { margin-top: 40px; font-size: 12px; color: #0f0; text-align: left; background: #222; padding: 15px; border-radius: 8px; font-family: monospace; }
+        #status { margin-top: 20px; color: #aaa; font-size: 14px; }
     </style>
 </head>
 <body>
     <h2>Premium Verification</h2>
-    <p>Klik hieronder om je wallet veilig te koppelen.</p>
+    <p>Klik op de knop hieronder om je wallet te koppelen aan Omni Bot.</p>
     
-    <button class="btn" onclick="doConnect()">🔗 Connect Phantom</button>
+    <button class="btn" onclick="connectWallet()">🔗 Connect Phantom</button>
     
-    <p id="status">Wachten op actie...</p>
-    
-    <div id="debug">System check wordt gestart...</div>
+    <p id="status"></p>
 
     <script>
-        // Veilige Telegram opstart
-        let tg = null;
-        try { tg = window.Telegram.WebApp; tg.expand(); } catch(e) {}
-
         const BOT_URL = "https://t.me/Omni_V1_Bot";
         const MY_URL = "https://noone3592.github.io/telegram-bot-app/wallet.html";
 
-        // Elke seconde checken we of de Phantom App de pagina goed heeft ingeladen
-        setInterval(() => {
-            const hasPhantom = !!(window.phantom && window.phantom.solana);
-            document.getElementById('debug').innerHTML = `
-                STATUS UPDATE:<br>
-                ----------------<br>
-                Phantom Injected : ${hasPhantom ? '✅ YES' : '❌ NO'}<br>
-                Platform         : ${tg ? 'Telegram' : 'Browser/Phantom'}<br>
-            `;
-        }, 1000);
-
-        async function doConnect() {
+        async function connectWallet() {
             const status = document.getElementById('status');
-            status.innerText = "Knop ingedrukt, laden...";
             
+            // 1. Zitten we IN de Phantom App? (Of hebben we de PC extensie?)
             const provider = window.phantom ? window.phantom.solana : null;
             
-            // SCENARIO 1: We zitten IN de Phantom App (of op de PC met extensie)
             if (provider && provider.isPhantom) {
                 status.innerText = "Phantom gevonden! Bevestig de pop-up...";
                 try {
@@ -58,29 +38,21 @@
                     const wallet = resp.publicKey.toString();
                     
                     status.style.color = "#0f0";
-                    status.innerText = "Gelukt! Je wordt nu teruggestuurd...";
+                    status.innerText = "Gelukt! Je wordt teruggestuurd naar Telegram...";
                     
-                    // Schiet de gebruiker terug naar de Telegram Bot
                     setTimeout(() => {
                         window.location.href = `${BOT_URL}?start=wallet_${wallet}`;
                     }, 1000);
-                    
                 } catch (err) {
                     status.style.color = "#f00";
                     status.innerText = "Fout: " + err.message;
                 }
             } 
-            // SCENARIO 2: We zitten in Telegram op de mobiel
+            // 2. We zitten in Telegram/Safari/Chrome -> Forceer de Phantom App te openen!
             else {
-                status.innerText = "Openen in Phantom App...";
+                status.innerText = "Phantom App openen...";
                 const encodedUrl = encodeURIComponent(MY_URL);
-                const deepLink = `https://phantom.app/ul/browse/${encodedUrl}?ref=${encodedUrl}`;
-                
-                if (tg && tg.openLink) {
-                    tg.openLink(deepLink);
-                } else {
-                    window.location.href = deepLink;
-                }
+                window.location.href = `https://phantom.app/ul/browse/${encodedUrl}?ref=${encodedUrl}`;
             }
         }
     </script>

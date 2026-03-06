@@ -3,94 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <title>Omni Bot - Multichain Auth</title>
     <style>
         body { background: #121212; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding-top: 50px; margin: 0; }
         .container { max-width: 90%; margin: 0 auto; background: #1e1e1e; padding: 30px 20px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
         h2 { color: #ab9ff2; margin-top: 0; }
-        .btn { background: #ab9ff2; color: #000; font-size: 18px; font-weight: bold; border: none; padding: 16px; border-radius: 12px; width: 100%; cursor: pointer; margin-top: 15px; }
+        .btn { background: #ab9ff2; color: #000; font-size: 18px; font-weight: bold; border: none; padding: 16px; border-radius: 12px; width: 100%; cursor: pointer; margin-top: 15px; display: none; }
+        .btn:active { background: #9580ff; }
+        p { color: #ccc; font-size: 15px; line-height: 1.5; }
         #status { margin-top: 20px; font-size: 14px; font-weight: bold; color: #aaa; }
-        
-        /* Dit is het nieuwe error-vakje! */
         #error-log { margin-top: 20px; font-family: monospace; font-size: 12px; color: #ff5555; text-align: left; background: #2a0000; padding: 10px; border-radius: 8px; display: none; }
     </style>
+
+    <script>
+        const isTelegramWebView = (window.TelegramWebview || navigator.userAgent.includes("Telegram"));
+        const isAndroid = /android/i.test(navigator.userAgent);
+        
+        if (isTelegramWebView && isAndroid) {
+            const url = window.location.href;
+            window.location.replace(`intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;end`);
+        }
+    </script>
 </head>
 <body>
-    <div class="container" id="content">
+    <div class="container">
         <h2>Governance Auth</h2>
         <p id="instruction">Loading secure environment...</p>
-        <div id="btn-container"></div>
+        
+        <button id="connect-btn" class="btn">🌍 Connect Wallet</button>
         <p id="status"></p>
         <div id="error-log"></div>
     </div>
 
-    <script>
-        // Voorkom het "Witte Scherm" Mysterie: print fouten op het scherm!
-        window.onerror = function(message, source, lineno, colno, error) {
-            const errLog = document.getElementById('error-log');
-            errLog.style.display = 'block';
-            errLog.innerHTML += `❌ Error: ${message} (Line ${lineno})<br>`;
-            document.getElementById('instruction').innerText = "Failed to load Web3 environment.";
-            return true;
-        };
-    </script>
-
     <script type="module">
-        import { createWeb3Modal, defaultConfig } from 'https://cdn.jsdelivr.net/npm/@web3modal/ethers5@3.1.0/+esm';
+        // De magische, standalone WalletConnect provider
+        import { EthereumProvider } from 'https://esm.sh/@walletconnect/ethereum-provider@2.11.1?bundle';
 
         const BOT_URL = "https://t.me/Omni_V1_Bot";
-        const projectId = 'f5f53aec4c83975405848c390e58eb60'; 
+        const projectId = 'f5f53aec4c83975405848c390e58eb60'; // Jouw ingevulde ID!
 
-        const mainnet = {
-            chainId: 1,
-            name: 'Ethereum',
-            currency: 'ETH',
-            explorerUrl: 'https://etherscan.io',
-            rpcUrl: 'https://cloudflare-eth.com'
-        };
-
-        const metadata = {
-            name: 'Omni Bot Governance',
-            description: 'Verify your wallet',
-            url: window.location.origin,
-            icons: ['https://avatars.githubusercontent.com/u/37784886']
-        };
-
+        const statusTxt = document.getElementById('status');
         const instructionTxt = document.getElementById('instruction');
-        const btnContainer = document.getElementById('btn-container');
+        const connectBtn = document.getElementById('connect-btn');
+        const errorLog = document.getElementById('error-log');
 
-        // Check of we in Telegram WebView zitten
-        if (window.TelegramWebview || navigator.userAgent.includes("Telegram")) {
-            instructionTxt.innerHTML = "⚠️ <b>Telegram blocks wallet connections.</b><br><br>Please open this page in <b>Chrome or Safari</b> by tapping the menu in the top right corner.";
+        function showError(msg) {
+            errorLog.style.display = 'block';
+            errorLog.innerHTML += `❌ ${msg}<br>`;
+        }
+
+        const isTelegram = (window.TelegramWebview || navigator.userAgent.includes("Telegram"));
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+        if (isTelegram && isIOS) {
+            instructionTxt.innerHTML = "⚠️ <b>Telegram blocks secure connections.</b><br><br>Please tap the compass icon (🧭) or the three dots in the top right corner to open this page in <b>Safari</b>.";
         } else {
-            // We zitten veilig in een normale browser!
-            const modal = createWeb3Modal({
-                ethersConfig: defaultConfig({ metadata }),
-                chains: [mainnet],
-                projectId,
-                enableAnalytics: false,
-                themeMode: 'dark'
-            });
+            async function initWalletConnect() {
+                try {
+                    // Initialiseer de provider (Dit is razendsnel en vereist geen React)
+                    const provider = await EthereumProvider.init({
+                        projectId: projectId,
+                        chains: [1], // Ethereum Mainnet (vereist door WalletConnect)
+                        showQrModal: true, // Dit tekent automatisch de mooie pop-up UI!
+                        qrModalOptions: {
+                            themeMode: "dark"
+                        }
+                    });
 
-            instructionTxt.innerHTML = "Click the button below to connect your multichain wallet.";
-            
-            const connectBtn = document.createElement('button');
-            connectBtn.className = 'btn';
-            connectBtn.innerText = '🌍 Connect Wallet';
-            connectBtn.onclick = () => modal.open();
-            btnContainer.appendChild(connectBtn);
+                    instructionTxt.innerHTML = "Click the button below to connect your multichain wallet.";
+                    connectBtn.style.display = 'block';
 
-            modal.subscribeProvider(state => {
-                if (state.address) {
-                    document.getElementById('status').style.color = "#00ff00";
-                    document.getElementById('status').innerText = "✅ Wallet Verified! Redirecting...";
-                    connectBtn.style.display = 'none';
-                    
-                    setTimeout(() => {
-                        window.location.href = BOT_URL + "?start=wallet_" + state.address;
-                    }, 1500);
+                    // Als de gebruiker op de knop klikt
+                    connectBtn.onclick = async () => {
+                        try {
+                            statusTxt.innerText = "Opening WalletConnect...";
+                            // Dit opent de pop-up
+                            await provider.enable(); 
+                            
+                            // Als we hier zijn, is het gelukt!
+                            const address = provider.accounts[0];
+                            
+                            statusTxt.style.color = "#00ff00";
+                            statusTxt.innerText = `✅ Success! Redirecting...`;
+                            connectBtn.style.display = 'none';
+
+                            // Stuur terug naar de bot
+                            setTimeout(() => {
+                                window.location.href = BOT_URL + "?start=wallet_" + address;
+                            }, 1500);
+
+                        } catch (err) {
+                            statusTxt.style.color = "#ffaa00";
+                            statusTxt.innerText = "Connection cancelled or failed.";
+                            showError(err.message);
+                        }
+                    };
+
+                } catch (err) {
+                    instructionTxt.innerText = "Initialization failed.";
+                    showError(err.message);
                 }
-            });
+            }
+
+            initWalletConnect();
         }
     </script>
 </body>

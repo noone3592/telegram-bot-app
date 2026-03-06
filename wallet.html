@@ -2,44 +2,56 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <title>Omni Bot - Premium Connect</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omni Bot - Connect</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: #121212; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding-top: 60px; margin: 0; }
-        .container { max-width: 90%; margin: 0 auto; background: #1e1e1e; padding: 30px 20px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
-        h2 { color: #ab9ff2; margin-top: 0; }
-        .btn { background: #ab9ff2; color: #000; font-size: 18px; font-weight: bold; border: none; padding: 16px; border-radius: 12px; width: 100%; cursor: pointer; margin-top: 15px; }
+        body { background: #121212; color: #fff; font-family: sans-serif; text-align: center; padding-top: 50px; margin: 0; }
+        .container { max-width: 90%; margin: 0 auto; background: #1e1e1e; padding: 30px 20px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        h2 { color: #ab9ff2; }
+        .btn { background: #ab9ff2; color: #000; font-size: 18px; font-weight: bold; border: none; padding: 15px; border-radius: 12px; width: 100%; cursor: pointer; margin-top: 20px; }
         .btn:active { background: #9580ff; }
         #status { margin-top: 20px; font-size: 14px; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container" id="content">
-        <h2>Premium Verification</h2>
-        <p>Checking environment...</p>
+        <h2>Loading...</h2>
     </div>
 
     <script>
+        const MY_URL = "https://noone3592.github.io/telegram-bot-app/wallet.html?v=10";
         const BOT_URL = "https://t.me/Omni_V1_Bot";
         
-        // JOUW OPLOSSING: Check voor Telegram in-app browser op Android
-        const isAndroid = /android/i.test(navigator.userAgent);
-        const isTelegramWebView = (window.TelegramWebview || navigator.userAgent.includes("Telegram"));
+        // Initialiseer de Telegram WebApp
+        const tg = window.Telegram.WebApp;
+        tg.expand();
 
-        if (isAndroid && isTelegramWebView) {
-            // Pas de magische intent URL toe die jij hebt gevonden!
-            const url = window.location.href;
-            const chromeUrl = `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;end`;
-            window.location.href = chromeUrl;
+        // Checken of we in de Telegram WebApp zitten (initDataUnsafe is dan gevuld)
+        if (tg.initDataUnsafe && Object.keys(tg.initDataUnsafe).length > 0) {
+            
+            // WE ZITTEN IN TELEGRAM: Gebruik jouw oplossing om Chrome/Safari te openen
+            document.getElementById("content").innerHTML = `
+                <h2>Secure Connection</h2>
+                <p>We need to open your browser to securely connect to Phantom.</p>
+                <button class="btn" onclick="openExternalBrowser()">🌍 Open in Browser</button>
+            `;
+            
         } else {
-            // Als we NIET in de in-app browser zitten (dus in Chrome/Safari), toon dan de Connect knop
+            
+            // WE ZITTEN IN CHROME/SAFARI: Toon de echte Phantom knop!
             document.getElementById("content").innerHTML = `
                 <h2>Premium Verification</h2>
-                <p>Click the button below to safely connect your Phantom wallet.</p>
+                <p>Click below to connect your wallet safely.</p>
                 <button class="btn" onclick="connectWallet()">🔗 Connect Phantom</button>
                 <p id="status"></p>
             `;
+            
+        }
+
+        function openExternalBrowser() {
+            // Jouw oplossing, plus de officiele {try_browser: true} flag om het af te dwingen!
+            Telegram.WebApp.openLink(MY_URL, { try_browser: true });
         }
 
         async function connectWallet() {
@@ -50,12 +62,11 @@
             
             if (provider && provider.isPhantom) {
                 try {
-                    // Forceer de connectie pop-up
                     const resp = await provider.connect();
                     const wallet = resp.publicKey.toString();
                     
                     status.style.color = "#00ff00";
-                    status.innerText = "✅ Success! Redirecting to Telegram...";
+                    status.innerText = "✅ Success! Redirecting back...";
                     
                     setTimeout(() => {
                         window.location.href = BOT_URL + "?start=wallet_" + wallet;

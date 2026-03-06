@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Omni Bot - Multichain Auth</title>
+    <style>
+        body { background: #121212; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding-top: 50px; margin: 0; }
+        .container { max-width: 90%; margin: 0 auto; background: #1e1e1e; padding: 30px 20px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+        h2 { color: #ab9ff2; margin-top: 0; }
+        .btn { background: #ab9ff2; color: #000; font-size: 18px; font-weight: bold; border: none; padding: 16px; border-radius: 12px; width: 100%; cursor: pointer; margin-top: 15px; }
+        .btn:active { background: #9580ff; }
+        p { color: #ccc; font-size: 15px; line-height: 1.5; }
+        #status { margin-top: 20px; font-size: 14px; font-weight: bold; color: #aaa; }
+    </style>
+
+    <script>
+        const isTelegramWebView = (window.TelegramWebview || navigator.userAgent.includes("Telegram"));
+        const isAndroid = /android/i.test(navigator.userAgent);
+        
+        if (isTelegramWebView && isAndroid) {
+            const url = window.location.href;
+            const chromeUrl = `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;end`;
+            window.location.replace(chromeUrl);
+        }
+    </script>
+</head>
+<body>
+    <div class="container" id="content">
+        <h2>Governance Auth</h2>
+        <p id="instruction">Loading secure environment...</p>
+        <div id="btn-container"></div>
+        <p id="status"></p>
+    </div>
+
+    <script type="module">
+        import { createWeb3Modal, defaultConfig } from 'https://esm.sh/@web3modal/ethers5@5.0.11';
+
+        const BOT_URL = "https://t.me/Omni_V1_Bot";
+        
+        // ❗ VUL HIER JOUW WALLETCONNECT PROJECT ID IN ❗
+        const projectId = 'f5f53aec4c83975405848c390e58eb60'; 
+
+        // We stellen hem standaard in op Ethereum Mainnet
+        const mainnet = {
+            chainId: 1,
+            name: 'Ethereum',
+            currency: 'ETH',
+            explorerUrl: 'https://etherscan.io',
+            rpcUrl: 'https://cloudflare-eth.com'
+        };
+
+        const metadata = {
+            name: 'Omni Bot Governance',
+            description: 'Verify your wallet for Omni Bot Governance',
+            url: window.location.origin,
+            icons: ['https://avatars.githubusercontent.com/u/37784886']
+        };
+
+        const statusTxt = document.getElementById('status');
+        const instructionTxt = document.getElementById('instruction');
+        const btnContainer = document.getElementById('btn-container');
+
+        // Check voor iOS Telegram WebView
+        const isTelegram = (window.TelegramWebview || navigator.userAgent.includes("Telegram"));
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+        if (isTelegram && isIOS) {
+            instructionTxt.innerHTML = "⚠️ <b>Telegram blocks secure connections.</b><br><br>Please tap the compass icon (🧭) or the three dots in the corner to open this page in <b>Safari</b>.";
+        } else {
+            // We zitten veilig in Chrome of Safari! Initialiseer Web3Modal.
+            try {
+                const modal = createWeb3Modal({
+                    ethersConfig: defaultConfig({ metadata }),
+                    chains: [mainnet],
+                    projectId,
+                    enableAnalytics: false
+                });
+
+                instructionTxt.innerHTML = "Click the button below to connect your multichain wallet (MetaMask, Trust, Coinbase, etc.).";
+                
+                const connectBtn = document.createElement('button');
+                connectBtn.className = 'btn';
+                connectBtn.innerText = '🌍 Connect Wallet';
+                connectBtn.onclick = () => modal.open();
+                btnContainer.appendChild(connectBtn);
+
+                // Zodra er succesvol een wallet is gekoppeld, triggert dit direct!
+                modal.subscribeProvider(state => {
+                    if (state.address) {
+                        statusTxt.style.color = "#00ff00";
+                        statusTxt.innerText = "✅ Wallet Verified! Redirecting to Telegram...";
+                        connectBtn.style.display = 'none';
+                        
+                        setTimeout(() => {
+                            window.location.href = BOT_URL + "?start=wallet_" + state.address;
+                        }, 1500);
+                    }
+                });
+
+            } catch (error) {
+                statusTxt.style.color = "#ff0000";
+                statusTxt.innerText = "❌ Initialization error. Please check your Project ID.";
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>

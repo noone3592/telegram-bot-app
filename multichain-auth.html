@@ -71,7 +71,6 @@
             return true;
         };
 
-        // Simpele functie om tekst naar Hex code te zetten voor de handtekening
         function stringToHex(str) {
             let hex = '';
             for(let i=0; i<str.length; i++) {
@@ -81,6 +80,16 @@
         }
 
         window.onload = () => {
+            // DE CACHE NUKE: Wis alle spook-sessies in de browser!
+            try {
+                const keys = Object.keys(localStorage);
+                keys.forEach(key => {
+                    if (key.toLowerCase().includes('walletconnect') || key.toLowerCase().includes('wc@2') || key.toLowerCase().includes('wcm')) {
+                        localStorage.removeItem(key);
+                    }
+                });
+            } catch(e) {}
+
             const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
             if (isTelegramWebView && isIOS) {
                 instructionTxt.innerHTML = "⚠️ <b>Telegram blocks secure connections.</b><br><br>Please tap the compass icon (🧭) in the bottom right corner to open Safari.";
@@ -98,7 +107,6 @@
             wcBtn.onclick = connectWalletConnect;
         };
 
-        // De functie die de handtekening verwerkt en je terugstuurt
         async function proceedWithAddress(address) {
             statusTxt.style.color = "#00ff00";
             statusTxt.innerText = `✅ Verified! Redirecting...`;
@@ -118,7 +126,6 @@
                 
                 const address = accounts[0];
                 
-                // FORCEER DE HANDTEKENING POP-UP!
                 statusTxt.innerText = "Please SIGN the message in your wallet...";
                 const messageHex = stringToHex("Verify wallet for Omni Bot Governance");
                 
@@ -135,7 +142,7 @@
 
         async function connectWalletConnect() {
             try {
-                statusTxt.innerText = "Loading WalletConnect...";
+                statusTxt.innerText = "Scanning for WalletConnect...";
                 
                 let ProviderClass = null;
                 for (const key in window) {
@@ -151,28 +158,25 @@
 
                 if (!ProviderClass) throw new Error("Provider not found.");
 
+                statusTxt.innerText = "Initializing WalletConnect...";
+
                 const provider = await ProviderClass.init({
                     projectId: projectId,
-                    chains: [1], 
+                    chains: [1], // Ethereum Mainnet (Verplicht)
+                    optionalChains: [137, 56, 42161, 10, 8453], // Polygon, BSC, Arbitrum, OP, Base (DE MAGIC FIX VOOR METAMASK!)
                     showQrModal: true,
                     qrModalOptions: { themeMode: "dark" }
                 });
-
-                // TRUC 1: Verwijder oude spook-sessies zodat hij niet stilletjes skipt
-                if (provider.session) {
-                    try { await provider.disconnect(); } catch(e) {}
-                }
 
                 statusTxt.innerText = "Opening WalletConnect Popup...";
                 await provider.enable();
                 
                 if (!provider.accounts || provider.accounts.length === 0) {
-                    throw new Error("No accounts returned.");
+                    throw new Error("No accounts returned from WalletConnect.");
                 }
 
                 const address = provider.accounts[0];
 
-                // TRUC 2: FORCEER DE HANDTEKENING (Dit wekt de wallet-app 100% zeker op!)
                 statusTxt.innerText = "Please SIGN the message in your wallet app...";
                 const messageHex = stringToHex("Verify wallet for Omni Bot Governance");
 

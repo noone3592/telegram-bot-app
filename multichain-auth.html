@@ -12,16 +12,15 @@
         window.process = { env: { NODE_ENV: "production" } };
         try { window.Buffer = window.Buffer || window.buffer.Buffer; } catch(e) {}
     </script>
-
-    <script src="https://unpkg.com/@walletconnect/ethereum-provider@2.14.0/dist/index.umd.js" 
-            onerror="document.getElementById('error-log').style.display='block'; document.getElementById('error-log').innerHTML+='❌ Fatal Error: Script blocked.<br>';"></script>
+    <script src="https://unpkg.com/@walletconnect/ethereum-provider@2.14.0/dist/index.umd.js"></script>
 
     <style>
         body { background: #121212; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding-top: 50px; margin: 0; }
         .container { max-width: 90%; margin: 0 auto; background: #1e1e1e; padding: 30px 20px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
         h2 { color: #ab9ff2; margin-top: 0; }
         .btn { background: #ab9ff2; color: #000; font-size: 18px; font-weight: bold; border: none; padding: 16px; border-radius: 12px; width: 100%; cursor: pointer; margin-top: 15px; display: none; }
-        .btn-alt { background: #ffaa00; color: #000; } 
+        .btn-mm { background: #f6851b; color: #fff; } /* MetaMask Oranje */
+        .btn-tw { background: #3375bb; color: #fff; } /* Trust Wallet Blauw */
         .btn:active { transform: scale(0.96); }
         p { color: #ccc; font-size: 15px; line-height: 1.5; }
         #status { margin-top: 20px; font-size: 14px; font-weight: bold; color: #aaa; }
@@ -41,10 +40,12 @@
 <body>
     <div class="container">
         <h2>Governance Auth</h2>
-        <p id="instruction">Loading tools...</p>
+        <p id="instruction">Checking environment...</p>
         
-        <button id="browser-btn" class="btn btn-alt">🦊 Browser Wallet</button>
-        <button id="wc-btn" class="btn">🌍 WalletConnect</button>
+        <button id="native-btn" class="btn">🦊 Connect Wallet</button>
+        <button id="mm-btn" class="btn btn-mm">🦊 Open in MetaMask</button>
+        <button id="tw-btn" class="btn btn-tw">🛡️ Open in Trust Wallet</button>
+        <button id="wc-btn" class="btn">🌍 WalletConnect (Desktop)</button>
         
         <p id="status"></p>
         <div id="error-log"></div>
@@ -52,22 +53,20 @@
 
     <script>
         const BOT_URL = "https://t.me/Omni_V1_Bot";
-        const projectId = 'f5f53aec4c83975405848c390e58eb60';
+        const projectId = 'f5f53aec4c83975405848c390e58eb60'; // Jouw WC ID als fallback
 
         const statusTxt = document.getElementById('status');
         const instructionTxt = document.getElementById('instruction');
-        const wcBtn = document.getElementById('wc-btn');
-        const browserBtn = document.getElementById('browser-btn');
         const errorLog = document.getElementById('error-log');
 
         function showError(msg) {
             errorLog.style.display = 'block';
             errorLog.innerHTML += `❌ ${msg}<br>`;
-            statusTxt.innerText = "Connection failed.";
+            statusTxt.innerText = "Action failed.";
         }
         
         window.onerror = function(msg, url, line) {
-            showError(`System: ${msg} (Line ${line})`);
+            showError(`System Error: ${msg} (Line ${line})`);
             return true;
         };
 
@@ -79,56 +78,75 @@
             return '0x' + hex;
         }
 
-        window.onload = () => {
-            // DE CACHE NUKE: Wis alle spook-sessies in de browser!
-            try {
-                const keys = Object.keys(localStorage);
-                keys.forEach(key => {
-                    if (key.toLowerCase().includes('walletconnect') || key.toLowerCase().includes('wc@2') || key.toLowerCase().includes('wcm')) {
-                        localStorage.removeItem(key);
-                    }
-                });
-            } catch(e) {}
-
-            const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-            if (isTelegramWebView && isIOS) {
-                instructionTxt.innerHTML = "⚠️ <b>Telegram blocks secure connections.</b><br><br>Please tap the compass icon (🧭) in the bottom right corner to open Safari.";
-                return;
-            }
-
-            instructionTxt.innerHTML = "Select a method below to safely connect your wallet.";
-
-            if (window.ethereum) {
-                browserBtn.style.display = 'block';
-                browserBtn.onclick = connectBrowserWallet;
-            }
-
-            wcBtn.style.display = 'block';
-            wcBtn.onclick = connectWalletConnect;
-        };
-
         async function proceedWithAddress(address) {
             statusTxt.style.color = "#00ff00";
             statusTxt.innerText = `✅ Verified! Redirecting...`;
-            wcBtn.style.display = 'none';
-            browserBtn.style.display = 'none';
+            
+            // Verberg alle knoppen
+            document.querySelectorAll('.btn').forEach(b => b.style.display = 'none');
 
+            // Terug naar Telegram!
             setTimeout(() => {
                 window.location.href = BOT_URL + "?start=wallet_" + address;
             }, 1500);
         }
 
-        async function connectBrowserWallet() {
+        window.onload = () => {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            // SCENARIO 1: We zitten al in een Wallet App (MetaMask/Trust In-App Browser)
+            if (window.ethereum) {
+                instructionTxt.innerHTML = "Secure connection available. Click below to verify your wallet.";
+                const nativeBtn = document.getElementById('native-btn');
+                nativeBtn.style.display = 'block';
+                nativeBtn.onclick = connectNativeWallet;
+                return; // Stop hier, we hebben de rest niet nodig!
+            }
+
+            // SCENARIO 2: We zitten op een Mobiele Telefoon (Chrome/Safari)
+            if (isMobile) {
+                instructionTxt.innerHTML = "To ensure a stable connection, please open this page directly in your wallet app.";
+                
+                const mmBtn = document.getElementById('mm-btn');
+                const twBtn = document.getElementById('tw-btn');
+                
+                mmBtn.style.display = 'block';
+                twBtn.style.display = 'block';
+
+                // Deep Link acties!
+                mmBtn.onclick = () => {
+                    // MetaMask vereist dat we 'https://' weghalen voor de deep link
+                    const cleanUrl = window.location.href.replace(/^https?:\/\//, '');
+                    window.location.href = `https://metamask.app.link/dapp/${cleanUrl}`;
+                };
+
+                twBtn.onclick = () => {
+                    const encodedUrl = encodeURIComponent(window.location.href);
+                    window.location.href = `https://link.trustwallet.com/open_url?coin_id=60&url=${encodedUrl}`;
+                };
+            } 
+            // SCENARIO 3: We zitten op een PC/Laptop (Fallback naar WalletConnect)
+            else {
+                instructionTxt.innerHTML = "Select WalletConnect to scan a QR code with your mobile app.";
+                const wcBtn = document.getElementById('wc-btn');
+                wcBtn.style.display = 'block';
+                wcBtn.onclick = connectWalletConnectFallback;
+            }
+        };
+
+        // --- DE NATIVE FUNCTIE (Voor binnenin MetaMask/Trust) ---
+        async function connectNativeWallet() {
             try {
-                statusTxt.innerText = "Requesting connection...";
+                statusTxt.innerText = "Connecting...";
                 const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
                 if (!accounts || accounts.length === 0) throw new Error("No accounts found.");
                 
                 const address = accounts[0];
                 
-                statusTxt.innerText = "Please SIGN the message in your wallet...";
+                statusTxt.innerText = "Please SIGN the message to verify...";
                 const messageHex = stringToHex("Verify wallet for Omni Bot Governance");
                 
+                // Forceert de handtekening pop-up direct in het scherm
                 await window.ethereum.request({
                     method: 'personal_sign',
                     params: [messageHex, address],
@@ -136,48 +154,31 @@
 
                 proceedWithAddress(address);
             } catch (err) {
-                showError("Browser Wallet: " + err.message);
+                showError("Verification rejected or failed.");
             }
         }
 
-        async function connectWalletConnect() {
+        // --- DE FALLBACK FUNCTIE (Voor PC gebruikers) ---
+        async function connectWalletConnectFallback() {
             try {
-                statusTxt.innerText = "Scanning for WalletConnect...";
+                statusTxt.innerText = "Loading WalletConnect...";
                 
-                let ProviderClass = null;
-                for (const key in window) {
-                    try {
-                        if (window[key] && typeof window[key].init === 'function' && key.toLowerCase().includes('ethereumprovider')) {
-                            ProviderClass = window[key]; break;
-                        }
-                        if (window[key] && window[key].EthereumProvider && typeof window[key].EthereumProvider.init === 'function') {
-                            ProviderClass = window[key].EthereumProvider; break;
-                        }
-                    } catch(e) {}
-                }
-
-                if (!ProviderClass) throw new Error("Provider not found.");
-
-                statusTxt.innerText = "Initializing WalletConnect...";
+                let ProviderClass = window.EthereumProvider || (window.WalletConnectEthereumProvider && window.WalletConnectEthereumProvider.EthereumProvider);
+                if (!ProviderClass) throw new Error("WalletConnect module not loaded.");
 
                 const provider = await ProviderClass.init({
                     projectId: projectId,
-                    chains: [1], // Ethereum Mainnet (Verplicht)
-                    optionalChains: [137, 56, 42161, 10, 8453], // Polygon, BSC, Arbitrum, OP, Base (DE MAGIC FIX VOOR METAMASK!)
+                    chains: [1], 
                     showQrModal: true,
                     qrModalOptions: { themeMode: "dark" }
                 });
 
-                statusTxt.innerText = "Opening WalletConnect Popup...";
+                statusTxt.innerText = "Opening QR Code...";
                 await provider.enable();
                 
-                if (!provider.accounts || provider.accounts.length === 0) {
-                    throw new Error("No accounts returned from WalletConnect.");
-                }
+                if (!provider.accounts || provider.accounts.length === 0) throw new Error("No accounts found.");
 
                 const address = provider.accounts[0];
-
-                statusTxt.innerText = "Please SIGN the message in your wallet app...";
                 const messageHex = stringToHex("Verify wallet for Omni Bot Governance");
 
                 await provider.request({
@@ -186,7 +187,6 @@
                 });
 
                 proceedWithAddress(address);
-
             } catch (err) {
                 showError("WalletConnect: " + err.message);
             }

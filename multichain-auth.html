@@ -4,33 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <title>Omni Bot - Multichain Auth</title>
+    <title>Omni Bot - Governance Auth</title>
 
-    <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/index.min.js"></script>
-    <script>
-        window.global = window;
-        window.process = { env: { NODE_ENV: "production" } };
-        try { window.Buffer = window.Buffer || window.buffer.Buffer; } catch(e) {}
-    </script>
-    <script src="https://unpkg.com/@walletconnect/ethereum-provider@2.14.0/dist/index.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
 
     <style>
         body { background: #121212; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding-top: 50px; margin: 0; }
         .container { max-width: 90%; margin: 0 auto; background: #1e1e1e; padding: 30px 20px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
         h2 { color: #ab9ff2; margin-top: 0; }
-        .btn { background: #ab9ff2; color: #000; font-size: 18px; font-weight: bold; border: none; padding: 16px; border-radius: 12px; width: 100%; cursor: pointer; margin-top: 15px; display: none; }
+        .btn { background: #ab9ff2; color: #000; font-size: 18px; font-weight: bold; border: none; padding: 16px; border-radius: 12px; width: 100%; cursor: pointer; margin-top: 15px; display: none; text-decoration: none; box-sizing: border-box; }
         
-        /* Specifieke Wallet Kleuren */
-        .btn-mm { background: #f6851b; color: #fff; } /* MetaMask */
-        .btn-tw { background: #3375bb; color: #fff; } /* Trust Wallet */
-        .btn-ph { background: #ab9ff2; color: #000; } /* Phantom */
-        .btn-uni { background: #ff007a; color: #fff; } /* Uniswap / WC */
-        .btn-success { background: #00ff00; color: #000; text-decoration: none; display: block; margin-top:20px; }
+        /* App specifieke kleuren */
+        .btn-mm { background: #f6851b; color: #fff; display: block; }
+        .btn-tw { background: #3375bb; color: #fff; display: block; }
+        .btn-ph { background: #ab9ff2; color: #000; display: block; }
+        .btn-success { background: #00ff00; color: #000; display: inline-block; }
         
         .btn:active { transform: scale(0.96); }
         p { color: #ccc; font-size: 15px; line-height: 1.5; }
         #status { margin-top: 20px; font-size: 14px; font-weight: bold; color: #aaa; }
-        #error-log { margin-top: 20px; font-family: monospace; font-size: 12px; color: #ff5555; text-align: left; background: #2a0000; padding: 10px; border-radius: 8px; display: none; overflow-wrap: break-word;}
     </style>
 
     <script>
@@ -46,37 +38,54 @@
 <body>
     <div class="container">
         <h2>Governance Auth</h2>
-        <p id="instruction">Checking environment...</p>
         
-        <button id="native-btn" class="btn">🔗 Connect & Verify</button>
-        <button id="mm-btn" class="btn btn-mm">🦊 MetaMask</button>
-        <button id="tw-btn" class="btn btn-tw">🛡️ Trust Wallet</button>
-        <button id="ph-btn" class="btn btn-ph">👻 Phantom</button>
-        <button id="wc-btn" class="btn btn-uni">🦄 Uniswap & Other Wallets</button>
+        <div id="buttons-container">
+            <p id="instruction">Select your wallet to authenticate.</p>
+            <button id="native-btn" class="btn">🔗 Connect & Sign</button>
+            <button id="mm-btn" class="btn btn-mm">🦊 MetaMask</button>
+            <button id="tw-btn" class="btn btn-tw">🛡️ Trust Wallet</button>
+            <button id="ph-btn" class="btn btn-ph">👻 Phantom</button>
+        </div>
         
-        <p id="status"></p>
-        <div id="error-log"></div>
+        <div id="status"></div>
     </div>
 
     <script>
-        // JOUW BOT GEGEVENS
         const BOT_USERNAME = "Omni_V1_Bot";
-        const projectId = 'f5f53aec4c83975405848c390e58eb60';
-
+        const MY_URL = window.location.origin + window.location.pathname; // Dynamische URL voor Phantom redirect
+        
         const statusTxt = document.getElementById('status');
         const instructionTxt = document.getElementById('instruction');
-        const errorLog = document.getElementById('error-log');
+        const buttonsContainer = document.getElementById('buttons-container');
 
-        function showError(msg) {
-            errorLog.style.display = 'block';
-            errorLog.innerHTML += `❌ ${msg}<br>`;
-            statusTxt.innerText = "Action failed.";
+        // --- BASE58 VOOR PHANTOM ---
+        const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+        function encodeBase58(buffer) {
+            let carry, digits = [0], i, j;
+            for (i = 0; i < buffer.length; ++i) {
+                for (j = 0, carry = buffer[i]; j < digits.length; ++j) {
+                    carry += digits[j] << 8; digits[j] = carry % 58; carry = (carry / 58) | 0;
+                }
+                while (carry > 0) { digits.push(carry % 58); carry = (carry / 58) | 0; }
+            }
+            let res = '';
+            for (i = 0; buffer[i] === 0 && i < buffer.length - 1; ++i) res += ALPHABET[0];
+            for (i = digits.length - 1; i >= 0; --i) res += ALPHABET[digits[i]];
+            return res;
         }
-        
-        window.onerror = function(msg, url, line) {
-            showError(`System Error: ${msg} (Line ${line})`);
-            return true;
-        };
+        function decodeBase58(string) {
+            let carry, bytes = [0], i, j;
+            for (i = 0; i < string.length; ++i) {
+                const char = string[i]; const val = ALPHABET.indexOf(char);
+                if (val < 0) throw new Error('Non-base58 character');
+                for (j = 0, carry = val; j < bytes.length; ++j) {
+                    carry += bytes[j] * 58; bytes[j] = carry & 0xff; carry >>= 8;
+                }
+                while (carry > 0) { bytes.push(carry & 0xff); carry >>= 8; }
+            }
+            for (i = 0; string[i] === '1' && i < string.length - 1; ++i) bytes.push(0);
+            return new Uint8Array(bytes.reverse());
+        }
 
         function stringToHex(str) {
             let hex = '';
@@ -86,139 +95,111 @@
             return '0x' + hex;
         }
 
-        // --- DE MAGISCHE REDIRECT TERUG NAAR TELEGRAM ---
-        function proceedWithAddress(address) {
-            // 1. Verberg alle wallet knoppen
-            document.querySelectorAll('.btn').forEach(b => b.style.display = 'none');
+        // --- DE "HOTEL CALIFORNIA" OPLOSSING ---
+        // Genereert een ECHTE HTML-knop die de in-app browser dwingt Telegram te openen
+        function showReturnButton(address) {
+            buttonsContainer.style.display = 'none';
             
-            // 2. Bouw de native Telegram app link (tg://) en de web link (https://)
-            const tgLink = `tg://resolve?domain=${BOT_USERNAME}&start=wallet_${address}`;
-            const webLink = `https://t.me/${BOT_USERNAME}?start=wallet_${address}`;
+            // De standaard t.me link. Als de gebruiker hier op tikt, breekt hij uit!
+            const tgWebLink = `https://t.me/${BOT_USERNAME}?start=wallet_${address}`;
 
-            // 3. Forceer direct de besturingssysteem pop-up!
-            window.location.href = tgLink;
-
-            // 4. Als de in-app browser het blokkeert, toon na 1 seconde een grote "Terug" knop!
-            setTimeout(() => {
-                statusTxt.innerHTML = `
-                    <span style="color:#00ff00; font-size:18px;">✅ Verified Successfully!</span><br><br>
-                    If Telegram didn't open automatically, click the button below:<br>
-                    <a href="${tgLink}" class="btn btn-success">⬅️ Return to Telegram</a><br>
-                    <a href="${webLink}" style="color:#ab9ff2; font-size:12px; margin-top:15px; display:inline-block;">Click here if the button fails</a>
-                `;
-            }, 1000);
+            statusTxt.innerHTML = `
+                <span style="color:#00ff00; font-size:22px;">✅ Verified Successfully!</span><br><br>
+                <p>You can now return to the bot to cast your vote.</p>
+                <a href="${tgWebLink}" class="btn btn-success" style="display:block; padding:20px;">⬅️ Return to Telegram</a>
+            `;
         }
 
         window.onload = () => {
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            
-            // SCENARIO 1: We zitten BINNEN in een Wallet App (MetaMask, Trust, of Phantom)
-            // Phantom injecteert 'window.phantom', MetaMask/Trust injecteert 'window.ethereum'
-            if (window.ethereum || window.phantom) {
-                instructionTxt.innerHTML = "Secure connection available. Click below to verify your wallet.";
+            const urlParams = new URLSearchParams(window.location.search);
+
+            // SCENARIO 1: We komen TERUG uit Phantom met versleutelde data!
+            if (urlParams.has('phantom_encryption_public_key')) {
+                buttonsContainer.style.display = 'none';
+                statusTxt.innerText = "Decrypting Phantom data...";
+                try {
+                    const skString = urlParams.get('sk');
+                    if (!skString) throw new Error("No safety key found.");
+                    
+                    const secretKey = decodeBase58(skString);
+                    const phantomPublicKey = decodeBase58(urlParams.get('phantom_encryption_public_key'));
+                    const nonce = decodeBase58(urlParams.get('nonce'));
+                    const data = decodeBase58(urlParams.get('data'));
+
+                    const decrypted = nacl.box.open(data, nonce, phantomPublicKey, secretKey);
+                    if (!decrypted) throw new Error("Decryption failed!");
+
+                    const decText = new TextDecoder().decode(decrypted);
+                    const parsedData = JSON.parse(decText);
+                    const walletAddress = parsedData.public_key;
+
+                    // Laat direct de Return knop zien!
+                    showReturnButton(walletAddress);
+                } catch (err) {
+                    statusTxt.innerHTML = `<span style="color:red;">❌ Verification Failed: ${err.message}</span>`;
+                }
+                return;
+            }
+
+            // SCENARIO 2: We zitten BINNEN in de MetaMask of Trust in-app browser
+            if (window.ethereum) {
+                document.getElementById('mm-btn').style.display = 'none';
+                document.getElementById('tw-btn').style.display = 'none';
+                document.getElementById('ph-btn').style.display = 'none';
+                
+                instructionTxt.innerHTML = "In-App Browser detected.<br>Click below to sign the verification message.";
                 const nativeBtn = document.getElementById('native-btn');
                 nativeBtn.style.display = 'block';
-                nativeBtn.onclick = connectNativeWallet;
-                return; 
+                nativeBtn.onclick = connectEVMWallet;
+                return;
             }
 
-            // SCENARIO 2: We zitten op een Mobiele Browser (Chrome/Safari)
-            if (isMobile) {
-                instructionTxt.innerHTML = "Select your wallet app to securely verify your identity.";
-                
-                const mmBtn = document.getElementById('mm-btn');
-                const twBtn = document.getElementById('tw-btn');
-                const phBtn = document.getElementById('ph-btn');
-                const wcBtn = document.getElementById('wc-btn');
-                
-                mmBtn.style.display = 'block';
-                twBtn.style.display = 'block';
-                phBtn.style.display = 'block';
-                wcBtn.style.display = 'block'; // WalletConnect is ook beschikbaar voor Uniswap/overige
+            // SCENARIO 3: Normale weergave (Knoppen naar de apps sturen)
+            const cleanUrl = window.location.href.replace(/^https?:\/\//, '');
+            const encodedUrl = encodeURIComponent(window.location.href);
 
-                const cleanUrl = window.location.href.replace(/^https?:\/\//, '');
-                const encodedUrl = encodeURIComponent(window.location.href);
-
-                // Deep Links per wallet
-                mmBtn.onclick = () => window.location.href = `https://metamask.app.link/dapp/${cleanUrl}`;
-                twBtn.onclick = () => window.location.href = `https://link.trustwallet.com/open_url?coin_id=60&url=${encodedUrl}`;
-                phBtn.onclick = () => window.location.href = `https://phantom.app/ul/browse/${encodedUrl}?ref=${encodedUrl}`;
-                wcBtn.onclick = connectWalletConnectFallback;
-            } 
-            // SCENARIO 3: We zitten op een PC/Laptop
-            else {
-                instructionTxt.innerHTML = "Select an option to scan a QR code with your mobile app.";
-                const wcBtn = document.getElementById('wc-btn');
-                wcBtn.style.display = 'block';
-                wcBtn.innerText = "🌍 Connect Wallet";
-                wcBtn.onclick = connectWalletConnectFallback;
-            }
+            document.getElementById('mm-btn').onclick = () => window.location.href = `https://metamask.app.link/dapp/${cleanUrl}`;
+            document.getElementById('tw-btn').onclick = () => window.location.href = `https://link.trustwallet.com/open_url?coin_id=60&url=${encodedUrl}`;
+            document.getElementById('ph-btn').onclick = connectPhantom;
         };
 
-        // --- DE IN-APP VERIFICATIE ---
-        async function connectNativeWallet() {
+        // --- EVM FUNCTIE (Voor MetaMask/Trust In-App Browser) ---
+        async function connectEVMWallet() {
             try {
                 statusTxt.innerText = "Connecting...";
-                
-                // Zoek de juiste Web3 provider (Ondersteuning voor Phantom EVM en MetaMask/Trust)
-                let provider = window.ethereum;
-                if (window.phantom && window.phantom.ethereum) {
-                    provider = window.phantom.ethereum;
-                }
-
-                if (!provider) throw new Error("No Web3 provider found in this app.");
-
-                const accounts = await provider.request({ method: 'eth_requestAccounts' });
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
                 if (!accounts || accounts.length === 0) throw new Error("No accounts found.");
                 
                 const address = accounts[0];
+                statusTxt.innerText = "Please SIGN the message...";
                 
-                statusTxt.innerText = "Please SIGN the message to verify...";
                 const messageHex = stringToHex("Verify wallet for Omni Bot Governance");
-                
-                await provider.request({
+                await window.ethereum.request({
                     method: 'personal_sign',
                     params: [messageHex, address],
                 });
 
-                proceedWithAddress(address);
+                // Laat de fysieke Return knop zien na goedkeuren!
+                showReturnButton(address);
             } catch (err) {
-                showError("Verification rejected or failed.");
+                statusTxt.innerHTML = `<span style="color:red;">❌ Cancelled or error.</span>`;
             }
         }
 
-        // --- DE WALLETCONNECT FUNCTIE (Voor Uniswap & PC) ---
-        async function connectWalletConnectFallback() {
-            try {
-                statusTxt.innerText = "Loading WalletConnect...";
-                
-                let ProviderClass = window.EthereumProvider || (window.WalletConnectEthereumProvider && window.WalletConnectEthereumProvider.EthereumProvider);
-                if (!ProviderClass) throw new Error("WalletConnect module not loaded.");
+        // --- PHANTOM FUNCTIE (De exact werkende truc van eerder) ---
+        function connectPhantom() {
+            statusTxt.innerText = "Opening Phantom...";
+            
+            const keypair = nacl.box.keyPair();
+            const secretKeyB58 = encodeBase58(keypair.secretKey);
+            const publicKeyB58 = encodeBase58(keypair.publicKey);
 
-                const provider = await ProviderClass.init({
-                    projectId: projectId,
-                    chains: [1], 
-                    showQrModal: true,
-                    qrModalOptions: { themeMode: "dark" }
-                });
+            const appUrl = encodeURIComponent("https://noone3592.github.io");
+            const redirectLink = encodeURIComponent(MY_URL + "?sk=" + secretKeyB58);
 
-                statusTxt.innerText = "Opening popup...";
-                await provider.enable();
-                
-                if (!provider.accounts || provider.accounts.length === 0) throw new Error("No accounts found.");
-
-                const address = provider.accounts[0];
-                const messageHex = stringToHex("Verify wallet for Omni Bot Governance");
-
-                await provider.request({
-                    method: "personal_sign",
-                    params: [messageHex, address]
-                });
-
-                proceedWithAddress(address);
-            } catch (err) {
-                showError("WalletConnect: " + err.message);
-            }
+            const deepLink = `https://phantom.app/ul/v1/connect?app_url=${appUrl}&dapp_encryption_public_key=${publicKeyB58}&redirect_link=${redirectLink}`;
+            
+            window.location.href = deepLink;
         }
     </script>
 </body>

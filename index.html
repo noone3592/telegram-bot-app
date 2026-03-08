@@ -3,89 +3,109 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Omnibo Control Center</title>
+    <title>Omni Control Center</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--tg-theme-bg-color, #f4f4f5);
-            color: var(--tg-theme-text-color, #000000);
+            background-color: var(--tg-theme-bg-color, #121212);
+            color: var(--tg-theme-text-color, #ffffff);
             margin: 0;
             padding: 0;
         }
         .header {
-            background-color: var(--tg-theme-secondary-bg-color, #ffffff);
+            background-color: var(--tg-theme-secondary-bg-color, #1e1e1e);
             padding: 15px;
             text-align: center;
             font-size: 18px;
             font-weight: bold;
-            border-bottom: 1px solid var(--tg-theme-hint-color, #ccc);
+            border-bottom: 1px solid var(--tg-theme-hint-color, #333);
+            color: #ab9ff2;
         }
         .tabs {
             display: flex;
-            background-color: var(--tg-theme-secondary-bg-color, #ffffff);
-            border-bottom: 1px solid var(--tg-theme-hint-color, #ccc);
+            background-color: var(--tg-theme-secondary-bg-color, #1e1e1e);
+            border-bottom: 1px solid var(--tg-theme-hint-color, #333);
         }
         .tab {
             flex: 1;
             text-align: center;
             padding: 12px 0;
             cursor: pointer;
-            color: var(--tg-theme-hint-color, #999);
-            font-weight: 600;
+            font-size: 14px;
+            color: var(--tg-theme-hint-color, #888);
             transition: 0.3s;
         }
         .tab.active {
-            color: var(--tg-theme-button-color, #3390ec);
-            border-bottom: 3px solid var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-color, #ab9ff2);
+            border-bottom: 2px solid var(--tg-theme-button-color, #ab9ff2);
+            font-weight: bold;
         }
-        .tab-content {
-            display: none;
+        .content {
             padding: 20px;
+            display: none;
         }
-        .tab-content.active {
+        .content.active {
             display: block;
+        }
+        
+        /* Form Elements */
+        .section-title {
+            font-size: 16px;
+            color: var(--tg-theme-button-color, #ab9ff2);
+            margin-top: 25px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
         }
         .form-group {
-            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--tg-theme-hint-color, #333);
         }
-        label {
-            display: block;
-            font-size: 14px;
-            margin-bottom: 5px;
-            color: var(--tg-theme-text-color, #000);
+        .form-group:last-child {
+            border-bottom: none;
+        }
+        .form-group label {
+            font-size: 15px;
             font-weight: 500;
         }
-        input[type="text"], textarea, select {
+        .input-group {
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+        .input-group label {
+            font-size: 13px;
+            color: var(--tg-theme-hint-color, #aaa);
+            margin-bottom: 5px;
+        }
+        input[type="text"], input[type="number"], textarea, select {
             width: 100%;
-            padding: 10px;
-            box-sizing: border-box;
-            border: 1px solid var(--tg-theme-hint-color, #ccc);
+            padding: 12px;
             border-radius: 8px;
-            background-color: var(--tg-theme-bg-color, #fff);
-            color: var(--tg-theme-text-color, #000);
+            border: 1px solid var(--tg-theme-hint-color, #444);
+            background-color: var(--tg-theme-secondary-bg-color, #1e1e1e);
+            color: var(--tg-theme-text-color, #fff);
             font-size: 14px;
+            box-sizing: border-box;
+            margin-bottom: 10px;
         }
         textarea {
             resize: vertical;
             min-height: 80px;
         }
-        .toggle-label {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-weight: 500;
-            padding: 10px 0;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-        }
-        /* iOS style toggle switch */
+        
+        /* Toggle Switch */
         .switch {
             position: relative;
             display: inline-block;
             width: 44px;
             height: 24px;
         }
-        .switch input { 
+        .switch input {
             opacity: 0;
             width: 0;
             height: 0;
@@ -94,8 +114,8 @@
             position: absolute;
             cursor: pointer;
             top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #ccc;
-            transition: .4s;
+            background-color: var(--tg-theme-hint-color, #555);
+            transition: .3s;
             border-radius: 24px;
         }
         .slider:before {
@@ -106,177 +126,180 @@
             left: 3px;
             bottom: 3px;
             background-color: white;
-            transition: .4s;
+            transition: .3s;
             border-radius: 50%;
         }
         input:checked + .slider {
-            background-color: var(--tg-theme-button-color, #3390ec);
+            background-color: var(--tg-theme-button-color, #ab9ff2);
         }
         input:checked + .slider:before {
             transform: translateX(20px);
         }
-        .info-text {
-            font-size: 12px;
-            color: var(--tg-theme-hint-color, #999);
-            margin-top: -5px;
-            margin-bottom: 10px;
+        
+        /* Main Button */
+        #main-btn {
             display: block;
+            width: calc(100% - 40px);
+            margin: 20px auto;
+            padding: 15px;
+            background-color: var(--tg-theme-button-color, #ab9ff2);
+            color: var(--tg-theme-button-text-color, #000);
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            cursor: pointer;
+        }
+        #main-btn:active {
+            opacity: 0.8;
+            transform: scale(0.98);
         }
     </style>
 </head>
 <body>
 
-    <div class="header">Omnibo Control Center</div>
-
-    <div class="tabs">
-        <div class="tab active" onclick="switchTab('crypto')">Crypto</div>
-        <div class="tab" onclick="switchTab('community')">Community</div>
-        <div class="tab" onclick="switchTab('security')">Security</div>
+    <div class="header">
+        ⚙️ Omni Control Center
     </div>
 
-    <div id="crypto" class="tab-content active">
-        <label class="toggle-label">
-            Enable BuyBot
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('tab-web3')">Web3 & Gov</div>
+        <div class="tab" onclick="switchTab('tab-comm')">Community</div>
+        <div class="tab" onclick="switchTab('tab-sec')">Security</div>
+    </div>
+
+    <div id="tab-web3" class="content active">
+        <div class="section-title">BuyBot & Raids</div>
+        <div class="form-group">
+            <label>BuyBot Active</label>
             <label class="switch"><input type="checkbox" id="buybot_active"><span class="slider"></span></label>
-        </label>
-        
-        <div class="form-group" style="margin-top: 15px;">
-            <label>BuyBot Contract Address (CA)</label>
+        </div>
+        <div class="input-group">
+            <label>BuyBot Token Contract (CA)</label>
             <input type="text" id="buybot_ca" placeholder="0x...">
         </div>
-
-        <div class="form-group">
+        <div class="input-group">
             <label>Active Raid Link (Twitter/X)</label>
             <input type="text" id="raid_link" placeholder="https://x.com/...">
         </div>
 
-        <label class="toggle-label" style="margin-top: 20px;">
-            Enable Governance Module
-            <label class="switch"><input type="checkbox" id="gov_auth"><span class="slider"></span></label>
-        </label>
-        <span class="info-text">Allows community to vote on proposals.</span>
-
+        <div class="section-title">🏛 Governance & Voting</div>
         <div class="form-group">
-            <label>Governance URL / Info</label>
-            <input type="text" id="gov_url" placeholder="Link to DAO or Snapshot">
+            <label>Require Wallet to Vote</label>
+            <label class="switch"><input type="checkbox" id="gov_auth"><span class="slider"></span></label>
+        </div>
+        <div class="input-group">
+            <label>Authentication Website URL</label>
+            <input type="text" id="gov_url" placeholder="https://your-site.github.io/multichain-auth.html">
+        </div>
+        <div class="input-group">
+            <label>Required Token CA to Vote</label>
+            <input type="text" id="gov_token_address" placeholder="Solana or EVM Address">
+        </div>
+        <div class="input-group">
+            <label>Minimum Tokens Required</label>
+            <input type="number" id="gov_min_tokens" placeholder="e.g. 10000">
         </div>
     </div>
 
-    <div id="community" class="tab-content">
-        <label class="toggle-label">
-            Welcome Messages
+    <div id="tab-comm" class="content">
+        <div class="section-title">Welcome Settings</div>
+        <div class="form-group">
+            <label>Welcome Messages</label>
             <label class="switch"><input type="checkbox" id="welcome_active"><span class="slider"></span></label>
-        </label>
-        
-        <div class="form-group" style="margin-top: 10px;">
-            <label>Welcome Message Text</label>
+        </div>
+        <div class="input-group">
+            <label>Custom Welcome Text</label>
             <textarea id="welcome_msg" placeholder="Welcome {user} to the group!"></textarea>
         </div>
-
-        <div class="form-group">
-            <label>Welcome Media URL (Image/GIF)</label>
-            <input type="text" id="welcome_anim" placeholder="https://link.to/image.jpg">
+        <div class="input-group">
+            <label>Welcome Animation (GIF/Image URL)</label>
+            <input type="text" id="welcome_anim" placeholder="https://...">
         </div>
-
-        <div class="form-group">
-            <label>Group Rules</label>
-            <textarea id="rules_text" placeholder="1. No spam..."></textarea>
-        </div>
-
-        <label class="toggle-label" style="margin-top: 20px;">
-            Auto-Translate Messages
-            <label class="switch"><input type="checkbox" id="auto_trans"><span class="slider"></span></label>
-        </label>
         
+        <div class="section-title">Information & Fun</div>
+        <div class="input-group">
+            <label>Chat Rules</label>
+            <textarea id="rules_text" placeholder="1. No spamming..."></textarea>
+        </div>
         <div class="form-group">
-            <label>Target Language</label>
+            <label>Quiz Module</label>
+            <label class="switch"><input type="checkbox" id="quiz_active"><span class="slider"></span></label>
+        </div>
+        <div class="form-group">
+            <label>Bored Module</label>
+            <label class="switch"><input type="checkbox" id="bored_active"><span class="slider"></span></label>
+        </div>
+
+        <div class="section-title">Translation</div>
+        <div class="form-group">
+            <label>Auto-Translate Setup</label>
+            <label class="switch"><input type="checkbox" id="auto_trans"><span class="slider"></span></label>
+        </div>
+        <div class="input-group">
+            <label>Target Language (Code)</label>
             <select id="target_lang">
-                <option value="en">English (EN)</option>
-                <option value="nl">Dutch (NL)</option>
-                <option value="es">Spanish (ES)</option>
-                <option value="fr">French (FR)</option>
-                <option value="de">German (DE)</option>
-                <option value="zh-CN">Chinese (CN)</option>
+                <option value="en">English (en)</option>
+                <option value="nl">Dutch (nl)</option>
+                <option value="es">Spanish (es)</option>
+                <option value="ru">Russian (ru)</option>
+                <option value="zh-cn">Chinese (zh-cn)</option>
             </select>
         </div>
-
-        <label class="toggle-label">
-            Quiz Module (Trivia)
-            <label class="switch"><input type="checkbox" id="quiz_active"><span class="slider"></span></label>
-        </label>
-
-        <label class="toggle-label">
-            Bored Module (/bored)
-            <label class="switch"><input type="checkbox" id="bored_active"><span class="slider"></span></label>
-        </label>
     </div>
 
-    <div id="security" class="tab-content">
-        <label class="toggle-label">
-            Anti-Spam Filter
+    <div id="tab-sec" class="content">
+        <div class="section-title">Automated Filters</div>
+        <div class="form-group">
+            <label>Anti-Spam (Links/Bots)</label>
             <label class="switch"><input type="checkbox" id="anti_spam"><span class="slider"></span></label>
-        </label>
-        <span class="info-text">Automatically bans users posting malicious links.</span>
-
-        <label class="toggle-label">
-            Anti-Flood
+        </div>
+        <div class="form-group">
+            <label>Anti-Flood (Spamming messages)</label>
             <label class="switch"><input type="checkbox" id="anti_flood"><span class="slider"></span></label>
-        </label>
-        <span class="info-text">Mutes users sending more than 5 messages in 5 seconds.</span>
-
-        <label class="toggle-label">
-            Abusive Language Filter
+        </div>
+        <div class="form-group">
+            <label>Anti-Swear</label>
             <label class="switch"><input type="checkbox" id="anti_swear"><span class="slider"></span></label>
-        </label>
-        <span class="info-text">Warns and mutes users for using profanity.</span>
-
-        <label class="toggle-label">
-            Anti-Scammer (CAS API)
+        </div>
+        <div class="form-group">
+            <label>Anti-Scam (Phishing detection)</label>
             <label class="switch"><input type="checkbox" id="anti_scam"><span class="slider"></span></label>
-        </label>
-        <span class="info-text">Automatically bans known scammers upon joining.</span>
+        </div>
 
-        <label class="toggle-label">
-            Captcha on Join
+        <div class="section-title">Entry Verification</div>
+        <div class="form-group">
+            <label>Math Captcha on Join</label>
             <label class="switch"><input type="checkbox" id="captcha_active"><span class="slider"></span></label>
-        </label>
-        <span class="info-text">Forces new users to solve a captcha before speaking.</span>
+        </div>
     </div>
+
+    <button id="main-btn">💾 Save Settings</button>
 
     <script>
         let tg = window.Telegram.WebApp;
-        tg.expand(); // Zorgt dat de webapp fullscreen opent
+        tg.expand();
 
-        // Haal het Chat ID op uit de URL (die we meesturen via de knop)
-        const urlParams = new URLSearchParams(window.location.search);
-        const chatId = urlParams.get('chat_id');
-
-        // Toon de main knop van Telegram
-        tg.MainButton.text = "SAVE SETTINGS";
-        tg.MainButton.show();
-
-        // Tab navigatie
         function switchTab(tabId) {
+            document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            
-            document.querySelector(`.tab[onclick="switchTab('${tabId}')"]`).classList.add('active');
             document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
         }
 
-        // Als de gebruiker op opslaan klikt
-        tg.MainButton.onClick(function() {
-            // Verzamel alle data
+        document.getElementById('main-btn').addEventListener('click', () => {
             const data = {
-                chat_id: chatId,
-                // Crypto
+                // Web3 & Gov
                 buybot_active: document.getElementById('buybot_active').checked ? 1 : 0,
                 buybot_ca: document.getElementById('buybot_ca').value,
                 raid_link: document.getElementById('raid_link').value,
                 gov_auth: document.getElementById('gov_auth').checked ? 1 : 0,
                 gov_url: document.getElementById('gov_url').value,
+                gov_token_address: document.getElementById('gov_token_address').value,
+                gov_min_tokens: parseFloat(document.getElementById('gov_min_tokens').value) || 0,
                 
-                // Community
+                // Community & Fun
                 welcome_active: document.getElementById('welcome_active').checked ? 1 : 0,
                 welcome_msg: document.getElementById('welcome_msg').value,
                 welcome_anim: document.getElementById('welcome_anim').value,
@@ -294,7 +317,6 @@
                 captcha_active: document.getElementById('captcha_active').checked ? 1 : 0
             };
 
-            // Stuur data terug naar de bot
             tg.sendData(JSON.stringify(data));
         });
     </script>
